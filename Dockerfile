@@ -1,13 +1,14 @@
-
-FROM python:3.10 as requirements-stage
+ FROM python:3.10 as requirements-stage
 
 WORKDIR /tmp
 
-RUN pip install poetry
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    mv /root/.local/bin/poetry /usr/local/bin/
 
 COPY ./pyproject.toml ./poetry.lock* /tmp/
 
-
+# Export requirements.txt
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
 FROM python:3.10
