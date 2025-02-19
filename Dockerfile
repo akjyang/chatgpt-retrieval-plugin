@@ -7,7 +7,8 @@ WORKDIR /app
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
     mv /root/.local/bin/poetry /usr/local/bin/ && \
-    poetry self add poetry-plugin-export
+    poetry self add poetry-plugin-export && \
+    poetry self update 1.1.0  # Ensure a compatible version is installed
 
 # Copy pyproject.toml and poetry.lock files
 COPY pyproject.toml poetry.lock* ./
