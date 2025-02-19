@@ -13,7 +13,7 @@ RUN curl -sSL https://install.python-poetry.org | python3 - && \
 COPY pyproject.toml poetry.lock* ./
 
 # Update the lock file to match pyproject.toml
-RUN poetry lock --no-update
+RUN poetry lock
 
 # Export dependencies to requirements.txt
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
