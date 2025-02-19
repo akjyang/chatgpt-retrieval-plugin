@@ -1,34 +1,43 @@
-FROM python:3.10 as requirements-stage
+# Stage 1: Build dependencies
+FROM python:3.10 AS builder
 
-WORKDIR /tmp
+# Set working directory
+WORKDIR /app
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
     mv /root/.local/bin/poetry /usr/local/bin/ && \
     poetry self add poetry-plugin-export
 
-COPY ./pyproject.toml ./poetry.lock* /tmp/
+# Copy pyproject.toml and poetry.lock files
+COPY pyproject.toml poetry.lock* ./
 
-# Export requirements.txt
+# Update the lock file to match pyproject.toml
+RUN poetry lock --no-update
+
+# Export dependencies to requirements.txt
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
+# Stage 2: Application
 FROM python:3.10
 
-WORKDIR /code
+# Set working directory
+WORKDIR /app
 
-COPY --from=requirements-stage /tmp/requirements.txt /code/requirements.txt
+# Install dependencies
+COPY --from=builder /app/requirements.txt .
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+# Copy application code
+COPY . .
 
-COPY . /code/
-
+# Set environment variables
 ARG RENDER_EXTERNAL_HOSTNAME
-# This finds instances of the placeholder domain and replaces them with the actual domain
 RUN grep -rl "your-app-url.com" . | xargs sed -i "s/your-app-url.com/${RENDER_EXTERNAL_HOSTNAME}/g"
 
-# The Blueprint file can inject the hostname into the environment, but source code expects http://hostname format
 ARG WEAVIATE_HOSTNAME
 ENV WEAVIATE_HOST=http://${WEAVIATE_HOSTNAME}
 
-# Render and Heroku use PORT, Azure App Services uses WEBSITES_PORT, Fly.io uses 8080 by default
-CMD ["sh", "-c", "uvicorn server.main:app --host 0.0.0.0 --port ${PORT:-${WEBSITES_PORT:-8080}}"]
+# Expose port and define entrypoint
+EXPOSE 8080
+CMD ["sh", "-c", "uvicorn server.main:app --host 0.0.0.0 --port ${PORT:-8080}"]
