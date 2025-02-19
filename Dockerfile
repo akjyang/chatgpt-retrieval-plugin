@@ -1,10 +1,11 @@
- FROM python:3.10 as requirements-stage
+FROM python:3.10 as requirements-stage
 
 WORKDIR /tmp
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 - && \
-    mv /root/.local/bin/poetry /usr/local/bin/
+    mv /root/.local/bin/poetry /usr/local/bin/ && \
+    poetry self add poetry-plugin-export
 
 COPY ./pyproject.toml ./poetry.lock* /tmp/
 
