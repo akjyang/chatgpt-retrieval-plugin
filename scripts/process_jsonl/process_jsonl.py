@@ -39,13 +39,19 @@ async def process_jsonl_dump(
 
         try:
             # Extract basic fields from the JSONL item
-            doc_id = item.get("id", None)
+            doc_id = item.get("id")
+            # If no document ID exists, generate a new unique ID
+            if not doc_id:
+                doc_id = str(uuid.uuid4())
+                print(f"No ID found in document; generated new ID: {doc_id}")
+                
             text = item.get("text", None)
 
             if not text:
                 print("No document text, skipping...")
                 continue
 
+            # Build metadata dictionary from top-level keys
             metadata_dict = {
                 "source": item.get("source", None),
                 "source_id": item.get("source_id", None),
@@ -70,7 +76,6 @@ async def process_jsonl_dump(
                     skipped_items.append(item)
                     continue
 
-            # Extract metadata if requested
             if extract_metadata:
                 extracted_metadata = extract_metadata_from_document(
                     f"Text: {text}; Metadata: {str(metadata)}"
