@@ -3,6 +3,7 @@ import os
 import json
 import logging
 import argparse
+import openai
 
 # Configure logging to show INFO-level messages.
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -19,14 +20,10 @@ def reset_chroma_embeddings(embeddings_file="/var/lib/chroma/chroma-embeddings.p
         logging.info("No existing embeddings file found. Nothing to delete.")
 
 # --- Step 2: Increase Logging in the Ingestion Process ---
-def generate_embedding(text: str):
-    """
-    Dummy function to simulate generating an embedding vector.
-    In your real implementation, this would call your embedding service (e.g., OpenAI API).
-    """
-    # Simulate an embedding vector with 768 dimensions
-    embedding = [0.1] * 768  
-    return embedding
+def get_embedding(text):
+    response = openai.Embedding.create(input=text, model="text-embedding-3-small")
+    data = response["data"]
+    return data
 
 def process_document_with_logging(document: dict):
     """
