@@ -41,29 +41,28 @@ async def process_jsonl_dump(
             # Extract basic fields from the JSONL item
             doc_id = item.get("id", None)
             text = item.get("text", None)
-            source = item.get("source", None)
-            source_id = item.get("source_id", None)
-            url = item.get("url", None)
-            created_at = item.get("created_at", None)
-            author = item.get("author", None)
 
             if not text:
                 print("No document text, skipping...")
                 continue
 
-            # Create the initial metadata object
-            metadata = DocumentMetadata(
-                source=source,
-                source_id=source_id,
-                url=url,
-                created_at=created_at,
-                author=author,
-            )
-            # Merge in the custom metadata (this works even if the key wasn't defined)
-            metadata = metadata.copy(update=custom_metadata)
+            metadata_dict = {
+                "source": item.get("source", None),
+                "source_id": item.get("source_id", None),
+                "url": item.get("url", None),
+                "created_at": item.get("created_at", None),
+                "author": item.get("author", None),
+            }
 
-            # Screen for PII if requested
-            # Note: Remove the hardcoded 'False' assignments below so that the flag values are respected.
+            # Check if there is a nested "metadata" field and merge it
+            if "metadata" in item and isinstance(item["metadata"], dict):
+                metadata_dict.update(item["metadata"])
+
+            # Create the initial metadata object using the combined dictionary
+            metadata = DocumentMetadata(**metadata_dict)
+            # Merge in the custom metadata (this works even if the key wasn't defined)
+            metadata = metadata.copy(update=custom_metadata)            
+
             if screen_for_pii:
                 pii_detected = screen_text_for_pii(text)
                 if pii_detected:
