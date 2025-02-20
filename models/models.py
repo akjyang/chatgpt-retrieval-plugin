@@ -27,7 +27,7 @@ class ChinguDocumentChunkMetadata(BaseModel):
     source: Optional[str] = None
 
 
-class ChinguDocumentChunk():
+class ChinguDocumentChunk(BaseModel):
     id: Optional[str] = None
     text: str
     metadata: ChinguDocumentChunkMetadata
