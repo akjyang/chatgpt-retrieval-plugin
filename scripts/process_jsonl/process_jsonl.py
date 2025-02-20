@@ -31,9 +31,8 @@ async def process_jsonl_dump(
             print(f"Processed {len(documents)} documents")
 
         try:
-            # get the id, text, source, source_id, url, created_at and author from the item
-            # use default values if not specified
-            id = item.get("id", None)
+            # extract basic fields from the JSONL item
+            doc_id = item.get("id", None)
             text = item.get("text", None)
             source = item.get("source", None)
             source_id = item.get("source_id", None)
@@ -45,7 +44,7 @@ async def process_jsonl_dump(
                 print("No document text, skipping...")
                 continue
 
-            # create a metadata object with the source, source_id, url, created_at and author
+            # create the initial metadata object
             metadata = DocumentMetadata(
                 source=source,
                 source_id=source_id,
@@ -53,58 +52,48 @@ async def process_jsonl_dump(
                 created_at=created_at,
                 author=author,
             )
+            # merge in the custom metadata (this works even if the key wasn't defined)
+            metadata = metadata.model_copy(update=custom_metadata)
 
-            # update metadata with custom values
-            for key, value in custom_metadata.items():
-                if hasattr(metadata, key):
-                    setattr(metadata, key, value)
-
-            # screen for pii if requested
+            # screen for PII if requested
             if screen_for_pii:
                 pii_detected = screen_text_for_pii(text)
-                # if pii detected, print a warning and skip the document
                 if pii_detected:
                     print("PII detected in document, skipping")
-                    skipped_items.append(item)  # add the skipped item to the list
+                    skipped_items.append(item)
                     continue
 
             # extract metadata if requested
             if extract_metadata:
-                # extract metadata from the document text
                 extracted_metadata = extract_metadata_from_document(
                     f"Text: {text}; Metadata: {str(metadata)}"
                 )
-                # get a Metadata object from the extracted metadata
+                # update the metadata with the extracted values (allowing extra fields)
                 metadata = DocumentMetadata(**extracted_metadata)
 
-            # create a document object with the id, text and metadata
+            # create the document object with id, text, and updated metadata
             document = Document(
-                id=id,
+                id=doc_id,
                 text=text,
                 metadata=metadata,
             )
             documents.append(document)
         except Exception as e:
-            # log the error and continue with the next item
             print(f"Error processing {item}: {e}")
-            skipped_items.append(item)  # add the skipped item to the list
+            skipped_items.append(item)
 
-    # do this in batches, the upsert method already batches documents but this allows
-    # us to add more descriptive logging
+    # Upsert documents in batches
     for i in range(0, len(documents), DOCUMENT_UPSERT_BATCH_SIZE):
-        # Get the text of the chunks in the current batch
         batch_documents = documents[i : i + DOCUMENT_UPSERT_BATCH_SIZE]
         print(f"Upserting batch of {len(batch_documents)} documents, batch {i}")
         await datastore.upsert(batch_documents)
 
-    # print the skipped items
     print(f"Skipped {len(skipped_items)} items due to errors or PII detection")
     for item in skipped_items:
         print(item)
 
 
 async def main():
-    # parse the command-line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", required=True, help="The path to the jsonl dump")
     parser.add_argument(
@@ -116,25 +105,22 @@ async def main():
         "--screen_for_pii",
         default=False,
         type=bool,
-        help="A boolean flag to indicate whether to try the PII detection function (using a language model)",
+        help="A boolean flag to indicate whether to try the PII detection function",
     )
     parser.add_argument(
         "--extract_metadata",
         default=False,
         type=bool,
-        help="A boolean flag to indicate whether to try to extract metadata from the document (using a language model)",
+        help="A boolean flag to indicate whether to try to extract metadata from the document",
     )
     args = parser.parse_args()
 
-    # get the arguments
     filepath = args.filepath
     custom_metadata = json.loads(args.custom_metadata)
     screen_for_pii = args.screen_for_pii
     extract_metadata = args.extract_metadata
 
-    # initialize the db instance once as a global variable
     datastore = await get_datastore()
-    # process the jsonl dump
     await process_jsonl_dump(
         filepath, datastore, custom_metadata, screen_for_pii, extract_metadata
     )
