@@ -47,24 +47,12 @@ class ChromaDataStore(DataStore):
             self._client = client
         else:
             if in_memory:
-                settings = (
-                    chromadb.config.Settings(
-                        chroma_db_impl="duckdb+parquet",
-                        persist_directory=persistence_dir,
-                    )
-                    if persistence_dir
-                    else chromadb.config.Settings()
-                )
-
-                self._client = chromadb.Client(settings=settings)
+                if persistence_dir:
+                    self._client = chromadb.PersistentClient(path=persistence_dir)
+                else:
+                    self._client = chromadb.EphemeralClient()
             else:
-                self._client = chromadb.Client(
-                    settings=chromadb.config.Settings(
-                        chroma_api_impl="rest",
-                        chroma_server_host=host,
-                        chroma_server_http_port=port,
-                    )
-                )
+                self._client = chromadb.HttpClient(host=host, port=port)
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
             embedding_function=None,
