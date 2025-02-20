@@ -13,7 +13,28 @@ class Source(str, Enum):
     attributes_grouped = "attributes_grouped"
     courses_term = "courses_term"
 
+class ChinguDocument(BaseModel):
+    id: Optional[str] = None
+    text: Optional[str] = None
 
+class ChinguDocumentChunkMetadata(BaseModel):
+    doc_type: Optional[str] = None  # e.g., "course", "attribute", "program"
+    course_code: Optional[str] = None
+    course_title: Optional[str] = None
+    course_unit: Optional[str] = None
+    term: Optional[str] = None
+    attribute: Optional[str] = None
+    source: Optional[str] = None
+
+
+class ChinguDocumentChunk():
+    id: Optional[str] = None
+    text: str
+    metadata: ChinguDocumentChunkMetadata
+    embedding: Optional[List[float]] = None
+    
+class ChinguDocumentChunkWithScore(ChinguDocumentChunk):
+    score: float
 
 class DocumentMetadata(BaseModel):
     source: Optional[Source] = None

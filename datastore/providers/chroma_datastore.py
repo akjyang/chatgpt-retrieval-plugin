@@ -21,6 +21,8 @@ from models.models import (
     DocumentChunk,
     DocumentChunkMetadata,
     DocumentChunkWithScore,
+    ChinguDocumentChunkWithScore,
+    ChinguDocumentChunkMetadata,
     DocumentMetadataFilter,
     QueryResult,
     QueryWithEmbedding,
@@ -186,6 +188,17 @@ class ChromaDataStore(DataStore):
             document_id=metadata.get("document_id", None),
         )
     
+    def _chingu_process_metadata_from_storage(self, metadata: Dict) -> DocumentChunkMetadata:
+        return ChinguDocumentChunkMetadata(
+            doc_type=metadata.get("doc_type", None),
+            course_code=metadata.get("course_code", None),
+            course_title=metadata.get("course_title", None),
+            course_unit=metadata.get("course_unit", None),
+            term=metadata.get("term", None),    
+            attribute=metadata.get("attribute", None),
+            source=Source(metadata["source"]) if "source" in metadata else None,
+        )
+    
     async def ping(self) -> bool:
         try:
             _ = self._collection.count()
@@ -248,10 +261,10 @@ class ChromaDataStore(DataStore):
             (distances,) = result["distances"]
             for id_, text, metadata, distance in zip(ids, documents, metadatas, distances):
                 inner_results.append(
-                    DocumentChunkWithScore(
+                    ChinguDocumentChunkWithScore(
                         id=id_,
                         text=text,
-                        metadata=self._process_metadata_from_storage(metadata),
+                        metadata=self._chingu_process_metadata_from_storage(metadata),
                         score=distance,
                     )
                 )
