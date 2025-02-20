@@ -78,7 +78,7 @@ class ChromaDataStore(DataStore):
         Groups documents by their 'doc_type' (from metadata) and upserts each group into its respective collection.
         Returns a list of document ids.
         """
-        # Group documents by doc_type; if not provided, use the default collection name.
+        # Group documents by doc_type; if not provided, use the default collection's name.
         groups: Dict[str, List[Document]] = defaultdict(list)
         for doc in documents:
             doc_type = (
@@ -96,9 +96,7 @@ class ChromaDataStore(DataStore):
                 name=group_name,
                 embedding_function=None,
             )
-            # Create chunks for the documents in this group
             chunks = get_document_chunks(docs, chunk_token_size)
-            # Upsert into the group-specific collection
             collection.upsert(
                 ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
                 embeddings=[
@@ -114,6 +112,23 @@ class ChromaDataStore(DataStore):
             )
             all_ids.extend(list(chunks.keys()))
         return all_ids
+
+    async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
+        """
+        Dummy implementation to satisfy the abstract method.
+        This method is not used when grouping by doc_type.
+        """
+        # Alternatively, you could choose to delegate to the default collection:
+        self._collection.upsert(
+            ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
+            embeddings=[chunk.embedding for chunk_list in chunks.values() for chunk in chunk_list],
+            documents=[chunk.text for chunk_list in chunks.values() for chunk in chunk_list],
+            metadatas=[
+                self._process_metadata_for_storage(chunk.metadata)
+                for chunk_list in chunks.values() for chunk in chunk_list
+            ],
+        )
+        return list(chunks.keys())
 
     def _where_from_query_filter(self, query_filter: DocumentMetadataFilter) -> Dict:
         output = {
