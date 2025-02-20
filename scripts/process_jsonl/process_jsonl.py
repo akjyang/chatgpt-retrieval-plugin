@@ -53,7 +53,7 @@ async def process_jsonl_dump(
                 author=author,
             )
             # merge in the custom metadata (this works even if the key wasn't defined)
-            metadata = metadata.model_copy(update=custom_metadata)
+            metadata = metadata.copy(update=custom_metadata)
 
             # screen for PII if requested
             if screen_for_pii:
