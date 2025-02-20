@@ -209,9 +209,25 @@ class ChromaDataStore(DataStore):
 
     async def stats(self) -> dict:
         """
-        Returns basic statistics about the datastore.
+        Returns basic statistics about the datastore by summing document counts across all collections.
         """
-        return {"document_count": self._collection.count()}
+        try:
+            # Retrieve all collections from the client.
+            collections = self._client.list_collections()
+            total_count = 0
+            stats_per_collection = {}
+            for coll in collections:
+                # Each collection's count
+                count = coll.count()
+                stats_per_collection[coll.name] = count
+                total_count += count
+            return {
+                "total_document_count": total_count,
+                "collections": stats_per_collection
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
 
     async def get_document(self, document_id: str) -> Optional[Document]:
         """
