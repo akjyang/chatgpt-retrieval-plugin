@@ -10,6 +10,7 @@ Consult the Chroma docs and GitHub repo for more information:
 import os
 from datetime import datetime
 from typing import Dict, List, Optional
+from collections import defaultdict
 
 import chromadb
 
@@ -74,38 +75,45 @@ class ChromaDataStore(DataStore):
         self, documents: List[Document], chunk_token_size: Optional[int] = None
     ) -> List[str]:
         """
-        Takes in a list of documents and inserts them into the database. If an id already exists, the document is updated.
-        Return a list of document ids.
+        Groups documents by their 'doc_type' (from metadata) and upserts each group into its respective collection.
+        Returns a list of document ids.
         """
+        # Group documents by doc_type; if not provided, use the default collection name.
+        groups: Dict[str, List[Document]] = defaultdict(list)
+        for doc in documents:
+            doc_type = (
+                doc.metadata.doc_type
+                if doc.metadata and getattr(doc.metadata, "doc_type", None)
+                else self._collection.name
+            )
+            groups[doc_type].append(doc)
 
-        chunks = get_document_chunks(documents, chunk_token_size)
-
-        # Chroma has a true upsert, so we don't need to delete first
-        return await self._upsert(chunks)
-
-    async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
-        """
-        Takes in a list of list of document chunks and inserts them into the database.
-        Return a list of document ids.
-        """
-
-        self._collection.upsert(
-            ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
-            embeddings=[
-                chunk.embedding
-                for chunk_list in chunks.values()
-                for chunk in chunk_list
-            ],
-            documents=[
-                chunk.text for chunk_list in chunks.values() for chunk in chunk_list
-            ],
-            metadatas=[
-                self._process_metadata_for_storage(chunk.metadata)
-                for chunk_list in chunks.values()
-                for chunk in chunk_list
-            ],
-        )
-        return list(chunks.keys())
+        all_ids = []
+        # Process each group separately
+        for group_name, docs in groups.items():
+            # Get or create a collection for this group
+            collection = self._client.get_or_create_collection(
+                name=group_name,
+                embedding_function=None,
+            )
+            # Create chunks for the documents in this group
+            chunks = get_document_chunks(docs, chunk_token_size)
+            # Upsert into the group-specific collection
+            collection.upsert(
+                ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
+                embeddings=[
+                    chunk.embedding for chunk_list in chunks.values() for chunk in chunk_list
+                ],
+                documents=[
+                    chunk.text for chunk_list in chunks.values() for chunk in chunk_list
+                ],
+                metadatas=[
+                    self._process_metadata_for_storage(chunk.metadata)
+                    for chunk_list in chunks.values() for chunk in chunk_list
+                ],
+            )
+            all_ids.extend(list(chunks.keys()))
+        return all_ids
 
     def _where_from_query_filter(self, query_filter: DocumentMetadataFilter) -> Dict:
         output = {
