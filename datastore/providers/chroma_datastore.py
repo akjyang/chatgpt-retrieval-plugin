@@ -11,6 +11,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional
 from collections import defaultdict
+import re
 
 import chromadb
 
@@ -33,6 +34,11 @@ CHROMA_HOST = os.environ.get("CHROMA_HOST", "http://127.0.0.1")
 CHROMA_PORT = os.environ.get("CHROMA_PORT", "8000")
 CHROMA_COLLECTION = os.environ.get("CHROMA_COLLECTION", "openaiembeddings")
 
+def sanitize_id(id_str: str) -> str:
+    """
+    Sanitize an ID string by replacing any non-word characters with underscores.
+    """
+    return re.sub(r'\W+', '_', id_str).strip('_')
 
 class ChromaDataStore(DataStore):
     def __init__(
@@ -77,26 +83,20 @@ class ChromaDataStore(DataStore):
         Groups documents by their 'doc_type' (from metadata) and upserts each group
         into its respective collection. Returns a flat list of document chunk ids.
         """
-        # Group documents by doc_type; if not provided, use the default collection's name.
         groups: Dict[str, List[Document]] = defaultdict(list)
         for doc in documents:
-            doc_type = (
-                doc.metadata.doc_type
-                if doc.metadata and getattr(doc.metadata, "doc_type", None)
-                else self._collection.name
-            )
+            # Use sanitized doc_type if available; otherwise use the default collection's name.
+            raw_doc_type = doc.metadata.doc_type if doc.metadata and getattr(doc.metadata, "doc_type", None) else self._collection.name
+            doc_type = sanitize_id(raw_doc_type)
             groups[doc_type].append(doc)
 
         all_ids = []
-        # Process each group separately
         for group_name, docs in groups.items():
-            # Get or create a collection for this group.
             collection = self._client.get_or_create_collection(
                 name=group_name,
                 embedding_function=None,
             )
             chunks = get_document_chunks(docs, chunk_token_size)
-            # Upsert all chunks from this group.
             collection.upsert(
                 ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
                 embeddings=[
@@ -110,15 +110,10 @@ class ChromaDataStore(DataStore):
                     for chunk_list in chunks.values() for chunk in chunk_list
                 ],
             )
-            # Return all chunk ids (not just the document ids)
             all_ids.extend([chunk.id for chunk_list in chunks.values() for chunk in chunk_list])
         return all_ids
 
     async def _upsert(self, chunks: Dict[str, List[DocumentChunk]]) -> List[str]:
-        """
-        Dummy implementation to satisfy the abstract method.
-        This method is not used when grouping by doc_type.
-        """
         self._collection.upsert(
             ids=[chunk.id for chunk_list in chunks.values() for chunk in chunk_list],
             embeddings=[chunk.embedding for chunk_list in chunks.values() for chunk in chunk_list],
@@ -192,9 +187,6 @@ class ChromaDataStore(DataStore):
         )
     
     async def ping(self) -> bool:
-        """
-        Checks the health of the datastore by trying a simple count query.
-        """
         try:
             _ = self._collection.count()
             return True
@@ -202,9 +194,6 @@ class ChromaDataStore(DataStore):
             return False
 
     async def stats(self) -> dict:
-        """
-        Returns basic statistics about the datastore by summing document counts across all collections.
-        """
         try:
             collections = self._client.list_collections()
             total_count = 0
@@ -221,11 +210,6 @@ class ChromaDataStore(DataStore):
             return {"error": str(e)}
 
     async def get_document(self, document_id: str) -> Optional[Document]:
-        """
-        Retrieve a document by its ID.
-        This method assumes that the document's ID is stored in the metadata under the key 'document_id'.
-        If multiple chunks exist for the document, only the first one is returned.
-        """
         result = self._collection.query(
             where={"document_id": document_id},
             include=["documents", "metadatas"]
@@ -239,9 +223,6 @@ class ChromaDataStore(DataStore):
         return Document(id=doc_id, text=text, metadata=metadata)
 
     async def list_collections(self) -> List[str]:
-        """
-        List the names of available collections in the datastore.
-        """
         try:
             collections = self._client.list_collections()
             return [collection.name for collection in collections]
@@ -258,7 +239,6 @@ class ChromaDataStore(DataStore):
             )
             for query in queries
         ]
-
         output = []
         for query, result in zip(queries, results):
             inner_results = []
@@ -287,7 +267,6 @@ class ChromaDataStore(DataStore):
         if delete_all:
             self._collection.delete()
             return True
-
         if ids and len(ids) > 0:
             if len(ids) > 1:
                 where_clause = {"$or": [{"document_id": id_} for id_ in ids]}
@@ -300,6 +279,5 @@ class ChromaDataStore(DataStore):
                 }
         elif filter:
             where_clause = self._where_from_query_filter(filter)
-
         self._collection.delete(where=where_clause)
         return True

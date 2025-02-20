@@ -1,6 +1,8 @@
 from typing import Dict, List, Optional, Tuple
 import uuid
+import re
 from models.models import Document, DocumentChunk, DocumentChunkMetadata
+
 import tiktoken
 from services.openai import get_embeddings
 
@@ -13,6 +15,12 @@ MIN_CHUNK_SIZE_CHARS = 350      # Minimum size of each chunk in characters
 MIN_CHUNK_LENGTH_TO_EMBED = 5   # Discard chunks shorter than this
 EMBEDDINGS_BATCH_SIZE = 128     # Number of embeddings to request at a time
 MAX_NUM_CHUNKS = 10000          # Maximum number of chunks to generate from a text
+
+def sanitize_id(id_str: str) -> str:
+    """
+    Sanitize an ID string by replacing non-alphanumeric characters with underscores.
+    """
+    return re.sub(r'\W+', '_', id_str).strip('_')
 
 def get_text_chunks(text: str, chunk_token_size: Optional[int]) -> List[str]:
     """
@@ -49,14 +57,19 @@ def get_text_chunks(text: str, chunk_token_size: Optional[int]) -> List[str]:
             chunks.append(remaining_text)
     return chunks
 
-def create_document_chunks(doc: Document, chunk_token_size: Optional[int]) -> Tuple[List[DocumentChunk], str]:
+def create_document_chunks(
+    doc: Document, chunk_token_size: Optional[int]
+) -> Tuple[List[DocumentChunk], str]:
     """
     Create document chunks from a Document. Generates a unique document id if missing,
-    splits the text into chunks, and assigns each chunk a unique id by appending a suffix.
+    splits the text into chunks, and assigns each chunk a unique id by appending an index.
+    The document id is sanitized to ensure safe chunk IDs.
     """
     if not doc.text or doc.text.isspace():
         return [], doc.id or str(uuid.uuid4())
-    doc_id = doc.id or str(uuid.uuid4())
+    # Generate and sanitize document id
+    raw_doc_id = doc.id or str(uuid.uuid4())
+    doc_id = sanitize_id(raw_doc_id)
     text_chunks = get_text_chunks(doc.text, chunk_token_size)
     # Create a metadata object for chunks and assign the document_id
     metadata = (
@@ -76,10 +89,12 @@ def create_document_chunks(doc: Document, chunk_token_size: Optional[int]) -> Tu
         doc_chunks.append(doc_chunk)
     return doc_chunks, doc_id
 
-def get_document_chunks(documents: List[Document], chunk_token_size: Optional[int]) -> Dict[str, List[DocumentChunk]]:
+def get_document_chunks(
+    documents: List[Document], chunk_token_size: Optional[int]
+) -> Dict[str, List[DocumentChunk]]:
     """
-    Convert a list of Documents into a dictionary mapping each document id to a list of DocumentChunk objects.
-    Also computes embeddings for each chunk.
+    Convert a list of Documents into a dictionary mapping each sanitized document id
+    to a list of DocumentChunk objects. Also computes embeddings for each chunk.
     """
     chunks: Dict[str, List[DocumentChunk]] = {}
     all_chunks: List[DocumentChunk] = []
