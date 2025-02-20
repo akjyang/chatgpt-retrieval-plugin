@@ -35,7 +35,7 @@ def process_document_with_logging(document: dict):
         return None
 
     # Generate embedding and log its dimension and first 5 values
-    embedding = generate_embedding(text)
+    embedding = get_embedding(text)
     logging.info(
         f"Generated embedding for document id {document.get('id', 'N/A')}: "
         f"Dimension = {len(embedding)}, First 5 values = {embedding[:5]}"
