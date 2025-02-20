@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import uuid
 import json
 import argparse
@@ -11,7 +12,6 @@ from services.pii_detection import screen_text_for_pii
 
 DOCUMENT_UPSERT_BATCH_SIZE = 50
 
-
 async def process_jsonl_dump(
     filepath: str,
     datastore: DataStore,
@@ -19,19 +19,26 @@ async def process_jsonl_dump(
     screen_for_pii: bool,
     extract_metadata: bool,
 ):
-    # open the jsonl file as a generator of dictionaries
-    with open(filepath) as jsonl_file:
+    # Print the parameters received for debugging
+    print("Starting process_jsonl_dump with:")
+    print("  filepath:", filepath)
+    print("  custom_metadata:", custom_metadata)
+    print("  screen_for_pii:", screen_for_pii)
+    print("  extract_metadata:", extract_metadata)
+    
+    # Open the jsonl file as a generator of dictionaries
+    with open(filepath, encoding="utf-8") as jsonl_file:
         data = [json.loads(line) for line in jsonl_file]
 
     documents = []
     skipped_items = []
-    # iterate over the data and create document objects
+    # Iterate over the data and create document objects
     for item in data:
         if len(documents) % 20 == 0:
-            print(f"Processed {len(documents)} documents")
+            print(f"Processed {len(documents)} documents so far.")
 
         try:
-            # extract basic fields from the JSONL item
+            # Extract basic fields from the JSONL item
             doc_id = item.get("id", None)
             text = item.get("text", None)
             source = item.get("source", None)
@@ -44,7 +51,7 @@ async def process_jsonl_dump(
                 print("No document text, skipping...")
                 continue
 
-            # create the initial metadata object
+            # Create the initial metadata object
             metadata = DocumentMetadata(
                 source=source,
                 source_id=source_id,
@@ -52,10 +59,11 @@ async def process_jsonl_dump(
                 created_at=created_at,
                 author=author,
             )
-            # merge in the custom metadata (this works even if the key wasn't defined)
+            # Merge in the custom metadata (this works even if the key wasn't defined)
             metadata = metadata.copy(update=custom_metadata)
 
-            # screen for PII if requested
+            # Screen for PII if requested
+            # Note: Remove the hardcoded 'False' assignments below so that the flag values are respected.
             if screen_for_pii:
                 pii_detected = screen_text_for_pii(text)
                 if pii_detected:
@@ -63,15 +71,15 @@ async def process_jsonl_dump(
                     skipped_items.append(item)
                     continue
 
-            # extract metadata if requested
+            # Extract metadata if requested
             if extract_metadata:
                 extracted_metadata = extract_metadata_from_document(
                     f"Text: {text}; Metadata: {str(metadata)}"
                 )
-                # update the metadata with the extracted values (allowing extra fields)
+                # Update the metadata with the extracted values (allowing extra fields)
                 metadata = DocumentMetadata(**extracted_metadata)
 
-            # create the document object with id, text, and updated metadata
+            # Create the document object with id, text, and updated metadata
             document = Document(
                 id=doc_id,
                 text=text,
@@ -85,10 +93,10 @@ async def process_jsonl_dump(
     # Upsert documents in batches
     for i in range(0, len(documents), DOCUMENT_UPSERT_BATCH_SIZE):
         batch_documents = documents[i : i + DOCUMENT_UPSERT_BATCH_SIZE]
-        print(f"Upserting batch of {len(batch_documents)} documents, batch {i}")
+        print(f"Upserting batch of {len(batch_documents)} documents (batch starting at index {i}).")
         await datastore.upsert(batch_documents)
 
-    print(f"Skipped {len(skipped_items)} items due to errors or PII detection")
+    print(f"Skipped {len(skipped_items)} items due to errors or PII detection:")
     for item in skipped_items:
         print(item)
 
@@ -104,27 +112,38 @@ async def main():
     parser.add_argument(
         "--screen_for_pii",
         default=False,
-        type=bool,
-        help="A boolean flag to indicate whether to try the PII detection function",
+        type=lambda x: x.lower() in ("true", "1", "yes", "y"),
+        help="A boolean flag to indicate whether to try the PII detection function (True/False)",
     )
     parser.add_argument(
         "--extract_metadata",
         default=False,
-        type=bool,
-        help="A boolean flag to indicate whether to try to extract metadata from the document",
+        type=lambda x: x.lower() in ("true", "1", "yes", "y"),
+        help="A boolean flag to indicate whether to try to extract metadata from the document (True/False)",
     )
     args = parser.parse_args()
 
     filepath = args.filepath
-    custom_metadata = json.loads(args.custom_metadata)
+    try:
+        custom_metadata = json.loads(args.custom_metadata)
+    except Exception as e:
+        print(f"Error parsing custom_metadata: {e}")
+        custom_metadata = {}
     screen_for_pii = args.screen_for_pii
     extract_metadata = args.extract_metadata
 
+    print("Arguments received in main():")
+    print("  filepath:", filepath)
+    print("  custom_metadata:", custom_metadata)
+    print("  screen_for_pii:", screen_for_pii)
+    print("  extract_metadata:", extract_metadata)
+
     datastore = await get_datastore()
+    print("Datastore instance:", datastore)
+
     await process_jsonl_dump(
         filepath, datastore, custom_metadata, screen_for_pii, extract_metadata
     )
-
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -20,7 +20,7 @@ def get_embeddings(texts: List[str]) -> List[List[float]]:
         Exception: If the OpenAI API call fails.
     """
     # Call the OpenAI API to get the embeddings
-    response = openai.Embedding.create(input=texts, model="text-embedding-ada-002")
+    response = openai.Embedding.create(input=texts, model="text-embedding-3-small")
 
     # Extract the embedding data from the response
     data = response["data"]  # type: ignore
