@@ -173,6 +173,57 @@ class ChromaDataStore(DataStore):
             author=metadata.get("author", None),
             document_id=metadata.get("document_id", None),
         )
+    
+    async def ping(self) -> bool:
+        """
+        Checks the health of the datastore by trying a simple count query.
+        """
+        try:
+            _ = self._collection.count()
+            return True
+        except Exception:
+            return False
+
+    async def stats(self) -> dict:
+        """
+        Returns basic statistics about the datastore.
+        """
+        return {"document_count": self._collection.count()}
+
+    async def get_document(self, document_id: str) -> Optional[Document]:
+        """
+        Retrieve a document by its ID.
+        This method assumes that the document's ID is stored in the metadata under the key 'document_id'.
+        If multiple chunks exist for the document, only the first one is returned.
+        """
+        result = self._collection.query(
+            where={"document_id": document_id},
+            include=["documents", "metadatas"]
+        )
+        # Check if results exist and contain at least one document.
+        if not result or not result.get("ids"):
+            return None
+
+        # Extract the first returned document's fields.
+        doc_id = result["ids"][0]
+        text = result["documents"][0]
+        metadata_dict = result["metadatas"][0]
+        # Process metadata into our DocumentChunkMetadata object.
+        metadata = self._process_metadata_from_storage(metadata_dict)
+        return Document(id=doc_id, text=text, metadata=metadata)
+
+    async def list_collections(self) -> List[str]:
+        """
+        List the names of available collections in the datastore.
+        If the client supports a direct method, use it; otherwise, fall back to the current collection.
+        """
+        try:
+            # Attempt to retrieve a list of collection objects (if supported).
+            collections = self._client.list_collections()
+            return [collection.name for collection in collections]
+        except Exception:
+            return [self._collection.name]
+
 
     async def _query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
         """
