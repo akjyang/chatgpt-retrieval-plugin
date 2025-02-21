@@ -12,6 +12,7 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from collections import defaultdict
+from services.openai import get_embeddings
 
 import chromadb
 from chromadb.config import Settings
@@ -20,10 +21,6 @@ from datastore.datastore import DataStore
 from models.models import (
     Document,
     DocumentChunk,
-    DocumentChunkMetadata,
-    DocumentChunkWithScore,
-    ChinguDocumentChunkWithScore,
-    ChinguDocumentChunkMetadata,
     DocumentMetadataFilter,
     QueryResult,
     QueryWithEmbedding,
@@ -350,7 +347,7 @@ class ChromaDataStore(DataStore):
 
 # --- New helper retriever class ---
 class MultiCollectionRetriever:
-    def __init__(self, datastore: ChromaDataStore, k: int = 5):
+    def __init__(self, datastore: "ChromaDataStore", k: int = 5):
         """
         :param datastore: An instance of ChromaDataStore.
         :param k: Number of documents to return per collection.
@@ -360,15 +357,13 @@ class MultiCollectionRetriever:
 
     async def get_relevant_documents(self, query_text: str) -> List[Any]:
         """
-        Wraps a single query (converted into a QueryWithEmbedding) to aggregate results
-        from all collections. Here we assume a basic embedding function has been applied
-        elsewhere and that query.top_k is set to self.k.
+        Embed the query using the OpenAI embedding process and then perform a multi-collection
+        query. Returns aggregated results from all collections.
         """
-        # For simplicity, we construct a QueryWithEmbedding with a dummy embedding.
-        # In a real implementation, you’d embed the query using your embedding function.
-        dummy_embedding = [0.0] * 768  # Replace with your actual embedding dimension
-        from models.models import QueryWithEmbedding
-        query_obj = QueryWithEmbedding(query=query_text, embedding=dummy_embedding, top_k=self.k, filter=None)
+        # Use the get_embeddings function from services.openai to obtain the query embedding.
+        # get_embeddings is synchronous, so you may run it in a thread pool if needed.
+        query_embedding = get_embeddings([query_text])[0]  # This should return an embedding of dimension 1536.
+        
+        query_obj = QueryWithEmbedding(query=query_text, embedding=query_embedding, top_k=self.k, filter=None)
         results = await self.datastore.multi_query([query_obj])
-        # Return the aggregated results from the single query.
         return results[0].results if results else []
