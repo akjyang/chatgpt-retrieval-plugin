@@ -70,7 +70,7 @@ async def process_jsonl_dump(
             # Create the initial metadata object using the combined dictionary
             metadata = DocumentMetadata(**metadata_dict)
             # Merge in the custom metadata (this works even if the key wasn't defined)
-            metadata = metadata.model_copy(update=custom_metadata)            
+            metadata = metadata.copy(update=custom_metadata)            
 
             screen_for_pii=False
             if screen_for_pii:
