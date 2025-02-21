@@ -128,6 +128,34 @@ class ChromaDataStore(DataStore):
             ],
         )
         return [chunk.id for chunk_list in chunks.values() for chunk in chunk_list]
+    
+    async def _query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
+        # For simplicity, delegate to multi_query (which aggregates over all collections)
+        return await self.multi_query(queries)
+
+    async def delete(
+        self,
+        ids: Optional[List[str]] = None,
+        filter: Optional[DocumentMetadataFilter] = None,
+        delete_all: Optional[bool] = None,
+    ) -> bool:
+        if delete_all:
+            self._collection.delete()
+            return True
+        if ids and len(ids) > 0:
+            if len(ids) > 1:
+                where_clause = {"$or": [{"document_id": id_} for id_ in ids]}
+            else:
+                (id_,) = ids
+                where_clause = {"document_id": id_}
+            if filter:
+                where_clause = {
+                    "$and": [self._where_from_query_filter(filter), where_clause]
+                }
+        elif filter:
+            where_clause = self._where_from_query_filter(filter)
+        self._collection.delete(where=where_clause)
+        return True
 
     def _where_from_query_filter(self, query_filter: DocumentMetadataFilter) -> Dict:
         output = {
@@ -227,8 +255,6 @@ class ChromaDataStore(DataStore):
             
             source=Source(metadata["source"]) if "source" in metadata else None,
         )
-
-
     
     async def ping(self) -> bool:
         try:

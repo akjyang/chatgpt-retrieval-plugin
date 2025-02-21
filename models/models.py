@@ -86,16 +86,28 @@ class DocumentMetadataFilter(BaseModel):
     author: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    doc_type: Optional[str] = None
+    # Additional fields from ChinguDocumentChunkMetadata:
+    doc_type: Optional[str] = None         # e.g., "course", "attribute", "program"
     course_code: Optional[str] = None
     course_title: Optional[str] = None
+    course_unit: Optional[str] = None
     term: Optional[str] = None
     attribute: Optional[str] = None
+    program_url: Optional[str] = None
+    academic_level: Optional[str] = None
+    school: Optional[str] = None
+    format: Optional[str] = None
+    major_minor: Optional[str] = None
+    degree: Optional[str] = None
+    requirements: Optional[List[dict]] = None
+    subject_url: Optional[str] = None
+    course_code_no: Optional[int] = None
+    instructor: Optional[str] = None
 
 class Query(BaseModel):
     query: str
     filter: Optional[DocumentMetadataFilter] = None
-    top_k: Optional[int] = 3
+    top_k: Optional[int] = 5
 
 class QueryWithEmbedding(Query):
     embedding: List[float]
