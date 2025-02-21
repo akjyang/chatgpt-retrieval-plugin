@@ -8,12 +8,13 @@ Consult the Chroma docs and GitHub repo for more information:
 """
 
 import os
-from datetime import datetime
-from typing import Dict, List, Optional
-from collections import defaultdict
 import re
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from collections import defaultdict
 
 import chromadb
+from chromadb.config import Settings
 
 from datastore.datastore import DataStore
 from models.models import (
@@ -34,6 +35,7 @@ CHROMA_IN_MEMORY = os.environ.get("CHROMA_IN_MEMORY", "True")
 CHROMA_PERSISTENCE_DIR = os.environ.get("CHROMA_PERSISTENCE_DIR", "openai")
 CHROMA_HOST = os.environ.get("CHROMA_HOST", "http://127.0.0.1")
 CHROMA_PORT = os.environ.get("CHROMA_PORT", "8000")
+# Default collection is now only used for backward compatibility.
 CHROMA_COLLECTION = os.environ.get("CHROMA_COLLECTION", "attributes")
 
 def sanitize_id(id_str: str) -> str:
@@ -57,22 +59,23 @@ class ChromaDataStore(DataStore):
         else:
             if in_memory:
                 settings = (
-                    chromadb.config.Settings(
+                    Settings(
                         chroma_db_impl="duckdb+parquet",
                         persist_directory=persistence_dir,
                     )
                     if persistence_dir
-                    else chromadb.config.Settings()
+                    else Settings()
                 )
                 self._client = chromadb.Client(settings=settings)
             else:
                 self._client = chromadb.Client(
-                    settings=chromadb.config.Settings(
+                    settings=Settings(
                         chroma_api_impl="rest",
                         chroma_server_host=host,
                         chroma_server_http_port=port,
                     )
                 )
+        # For legacy operations we still keep a default collection.
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
             embedding_function=None,
@@ -87,7 +90,6 @@ class ChromaDataStore(DataStore):
         """
         groups: Dict[str, List[Document]] = defaultdict(list)
         for doc in documents:
-            # Use sanitized doc_type if available; otherwise use the default collection's name.
             raw_doc_type = doc.metadata.doc_type if doc.metadata and getattr(doc.metadata, "doc_type", None) else self._collection.name
             doc_type = sanitize_id(raw_doc_type)
             groups[doc_type].append(doc)
@@ -158,7 +160,7 @@ class ChromaDataStore(DataStore):
             }
         return output
 
-    def _process_metadata_for_storage(self, metadata: DocumentChunkMetadata) -> Dict:
+    def _process_metadata_for_storage(self, metadata: Any) -> Dict:
         stored_metadata = {}
         if metadata.source:
             stored_metadata["source"] = metadata.source.value
@@ -174,9 +176,16 @@ class ChromaDataStore(DataStore):
             stored_metadata["author"] = metadata.author
         if metadata.document_id:
             stored_metadata["document_id"] = metadata.document_id
+        # Preserve additional keys (e.g., doc_type, course_code, etc.)
+        extra_keys = ["doc_type", "course_code", "course_title", "term", "attribute"]
+        for key in extra_keys:
+            if hasattr(metadata, key) and getattr(metadata, key) is not None:
+                stored_metadata[key] = getattr(metadata, key)
         return stored_metadata
 
-    def _process_metadata_from_storage(self, metadata: Dict) -> DocumentChunkMetadata:
+    def _process_metadata_from_storage(self, metadata: Dict) -> Any:
+        # Reconstruct metadata for general document chunks.
+        from models.models import DocumentChunkMetadata
         return DocumentChunkMetadata(
             source=Source(metadata["source"]) if "source" in metadata else None,
             source_id=metadata.get("source_id", None),
@@ -185,10 +194,16 @@ class ChromaDataStore(DataStore):
             if "created_at" in metadata
             else None,
             author=metadata.get("author", None),
-            document_id=metadata.get("document_id", None),
+            doc_type=metadata.get("doc_type", None),
+            course_code=metadata.get("course_code", None),
+            course_title=metadata.get("course_title", None),
+            term=metadata.get("term", None),
+            attribute=metadata.get("attribute", None),
         )
     
-    def _chingu_process_metadata_from_storage(self, metadata: Dict) -> DocumentChunkMetadata:
+    def _chingu_process_metadata_from_storage(self, metadata: Dict) -> Any:
+        from models.models import ChinguDocumentChunkMetadata
+        
         return ChinguDocumentChunkMetadata(
             doc_type=metadata.get("doc_type", None),
             course_code=metadata.get("course_code", None),
@@ -196,8 +211,24 @@ class ChromaDataStore(DataStore):
             course_unit=metadata.get("course_unit", None),
             term=metadata.get("term", None),    
             attribute=metadata.get("attribute", None),
+            
+            program_url=metadata.get("program_url", None),
+            academic_level=metadata.get("academic_level", None),
+            school=metadata.get("school", None),
+            format=metadata.get("format", None),
+            major_minor=metadata.get("major_minor", None),
+            degree=metadata.get("degree", None),
+            
+            requirements=metadata.get("requirements", []),
+
+            subject_url=metadata.get("subject_url", None),
+            course_code_no=metadata.get("course_code_no", None),
+            instructor=metadata.get("instructor", None),
+            
             source=Source(metadata["source"]) if "source" in metadata else None,
         )
+
+
     
     async def ping(self) -> bool:
         try:
@@ -242,55 +273,76 @@ class ChromaDataStore(DataStore):
         except Exception:
             return [self._collection.name]
 
-    async def _query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
-        results = [
-            self._collection.query(
-                query_embeddings=[query.embedding],
-                include=["documents", "distances", "metadatas"],
-                n_results=min(query.top_k, self._collection.count()),
-                where=(self._where_from_query_filter(query.filter) if query.filter else {}),
-            )
-            for query in queries
-        ]
-        output = []
-        for query, result in zip(queries, results):
-            inner_results = []
-            (ids,) = result["ids"]
-            (documents,) = result["documents"]
-            (metadatas,) = result["metadatas"]
-            (distances,) = result["distances"]
-            for id_, text, metadata, distance in zip(ids, documents, metadatas, distances):
-                inner_results.append(
-                    ChinguDocumentChunkWithScore(
-                        id=id_,
-                        text=text,
-                        metadata=self._chingu_process_metadata_from_storage(metadata),
-                        score=distance,
-                    )
+    # --- New multi-query method for querying across all collections ---
+    async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
+        """
+        For each query in queries, iterate over all collections in the client,
+        perform a similarity query (with n_results=k) on each, tag results with the
+        collection name, and then aggregate and sort them.
+        """
+        aggregated_results = []
+        # Get all collections from the client.
+        all_collections = self._client.list_collections()
+        for query in queries:
+            combined_results = []
+            for coll in all_collections:
+                # Use k = 5 per collection.
+                n_results = min(query.top_k if query.top_k else 5, coll.count() or 5)
+                result = coll.query(
+                    query_embeddings=[query.embedding],
+                    include=["documents", "distances", "metadatas"],
+                    n_results=n_results,
+                    where=(self._where_from_query_filter(query.filter) if query.filter else {}),
                 )
-            output.append(QueryResult(query=query.query, results=inner_results))
-        return output
+                # The Chroma query returns each field wrapped in a list/tuple;
+                if result and result.get("ids"):
+                    # Here we assume result["ids"] is a list with one element: a list of ids.
+                    ids = result["ids"][0]
+                    documents = result["documents"][0]
+                    metadatas = result["metadatas"][0]
+                    distances = result["distances"][0]
+                    for id_, doc_text, meta, distance in zip(ids, documents, metadatas, distances):
+                        # Tag each result with its source collection.
+                        meta["source_collection"] = coll.name
+                        # Create a ChinguDocumentChunkWithScore object.
+                        from models.models import ChinguDocumentChunkWithScore, ChinguDocumentChunkMetadata
+                        # Process metadata (using our helper)
+                        processed_meta = self._chingu_process_metadata_from_storage(meta)
+                        combined_results.append(
+                            ChinguDocumentChunkWithScore(
+                                id=id_,
+                                text=doc_text,
+                                metadata=processed_meta,
+                                score=distance,
+                            )
+                        )
+            # Optionally, sort combined_results by score (assuming lower is better)
+            combined_results.sort(key=lambda x: x.score)
+            from models.models import QueryResult
+            aggregated_results.append(QueryResult(query=query.query, results=combined_results))
+        return aggregated_results
 
-    async def delete(
-        self,
-        ids: Optional[List[str]] = None,
-        filter: Optional[DocumentMetadataFilter] = None,
-        delete_all: Optional[bool] = None,
-    ) -> bool:
-        if delete_all:
-            self._collection.delete()
-            return True
-        if ids and len(ids) > 0:
-            if len(ids) > 1:
-                where_clause = {"$or": [{"document_id": id_} for id_ in ids]}
-            else:
-                (id_,) = ids
-                where_clause = {"document_id": id_}
-            if filter:
-                where_clause = {
-                    "$and": [self._where_from_query_filter(filter), where_clause]
-                }
-        elif filter:
-            where_clause = self._where_from_query_filter(filter)
-        self._collection.delete(where=where_clause)
-        return True
+# --- New helper retriever class ---
+class MultiCollectionRetriever:
+    def __init__(self, datastore: ChromaDataStore, k: int = 5):
+        """
+        :param datastore: An instance of ChromaDataStore.
+        :param k: Number of documents to return per collection.
+        """
+        self.datastore = datastore
+        self.k = k
+
+    async def get_relevant_documents(self, query_text: str) -> List[Any]:
+        """
+        Wraps a single query (converted into a QueryWithEmbedding) to aggregate results
+        from all collections. Here we assume a basic embedding function has been applied
+        elsewhere and that query.top_k is set to self.k.
+        """
+        # For simplicity, we construct a QueryWithEmbedding with a dummy embedding.
+        # In a real implementation, you’d embed the query using your embedding function.
+        dummy_embedding = [0.0] * 768  # Replace with your actual embedding dimension
+        from models.models import QueryWithEmbedding
+        query_obj = QueryWithEmbedding(query=query_text, embedding=dummy_embedding, top_k=self.k, filter=None)
+        results = await self.datastore.multi_query([query_obj])
+        # Return the aggregated results from the single query.
+        return results[0].results if results else []
