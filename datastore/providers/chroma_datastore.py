@@ -215,7 +215,6 @@ class ChromaDataStore(DataStore):
 
 
     def _process_metadata_from_storage(self, metadata: Dict) -> Any:
-        print("Metadata Retrieved from ChromaDB:", metadata)
         # Reconstruct metadata for general document chunks.
         from models.models import DocumentChunkMetadata
         return DocumentChunkMetadata(
@@ -322,7 +321,7 @@ class ChromaDataStore(DataStore):
                     coll_k = query.top_k_programs if query.top_k_programs is not None else (query.top_k or 5)
                 elif coll_name == "courses":
                     coll_k = query.top_k_courses if query.top_k_courses is not None else (query.top_k or 5)
-                elif coll_name in ("attributes", "attributes_flat", "attributes_grouped"):
+                elif coll_name == "attributes":
                     coll_k = query.top_k_attributes if query.top_k_attributes is not None else (query.top_k or 5)
                 else:
                     coll_k = query.top_k or 5
