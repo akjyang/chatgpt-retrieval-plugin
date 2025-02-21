@@ -215,6 +215,7 @@ class ChromaDataStore(DataStore):
 
 
     def _process_metadata_from_storage(self, metadata: Dict) -> Any:
+        print("Metadata Retrieved from ChromaDB:", metadata)
         # Reconstruct metadata for general document chunks.
         from models.models import DocumentChunkMetadata
         return DocumentChunkMetadata(
