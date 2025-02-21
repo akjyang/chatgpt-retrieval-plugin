@@ -312,13 +312,13 @@ class ChromaDataStore(DataStore):
                 coll_name = coll.name.lower()
                 # Determine the k value based on the collection name and the query parameters.
                 if coll_name == "programs":
-                    coll_k = query.top_k_programs if hasattr(query, "top_k_programs") and query.top_k_programs is not None else (query.top_k if query.top_k is not None else 5)
+                    coll_k = query.top_k_programs if query.top_k_programs is not None else (query.top_k or 5)
                 elif coll_name == "courses":
-                    coll_k = query.top_k_courses if hasattr(query, "top_k_courses") and query.top_k_courses is not None else (query.top_k if query.top_k is not None else 5)
+                    coll_k = query.top_k_courses if query.top_k_courses is not None else (query.top_k or 5)
                 elif coll_name in ("attributes", "attributes_flat", "attributes_grouped"):
-                    coll_k = query.top_k_attributes if hasattr(query, "top_k_attributes") and query.top_k_attributes is not None else (query.top_k if query.top_k is not None else 5)
+                    coll_k = query.top_k_attributes if query.top_k_attributes is not None else (query.top_k or 5)
                 else:
-                    coll_k = query.top_k if query.top_k is not None else 5
+                    coll_k = query.top_k or 5
 
                 # Ensure we do not request more than the collection's count.
                 n_results = min(coll_k, coll.count() or coll_k)

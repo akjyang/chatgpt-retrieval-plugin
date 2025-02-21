@@ -107,13 +107,13 @@ class DocumentMetadataFilter(BaseModel):
 class Query(BaseModel):
     query: str
     filter: Optional[DocumentMetadataFilter] = None
-    top_k: int = 5
-    top_k_programs: int = 3
-    top_k_courses: int = 10
-    top_k_attributes: int = 7
+    top_k: Optional[int] = 5
 
 class QueryWithEmbedding(Query):
     embedding: List[float]
+    top_k_programs: Optional[int] = 3
+    top_k_courses: Optional[int] = 10
+    top_k_attributes: Optional[int] = 7
 
 class QueryResult(BaseModel):
     query: str
