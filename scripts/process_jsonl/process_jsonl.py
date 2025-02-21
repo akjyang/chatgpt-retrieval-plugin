@@ -104,7 +104,8 @@ async def process_jsonl_dump(
     for i in range(0, len(documents), DOCUMENT_UPSERT_BATCH_SIZE):
         batch_documents = documents[i : i + DOCUMENT_UPSERT_BATCH_SIZE]
         print(f"Upserting batch of {len(batch_documents)} documents (batch starting at index {i}).")
-        await datastore.upsert(batch_documents)
+        ids = await datastore.upsert(batch_documents)
+        print("Uploaded documents ids:", ids)
 
     print(f"Skipped {len(skipped_items)} items due to errors or PII detection:")
     for item in skipped_items:
