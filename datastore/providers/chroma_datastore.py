@@ -362,10 +362,14 @@ class MultiCollectionRetriever:
         self.datastore = datastore
         self.k = k
 
-    async def get_relevant_documents(self, query_text: str) -> List[Any]:
+    async def get_relevant_documents(
+        self, 
+        query_text: str, 
+        query_filter: Optional[DocumentMetadataFilter] = None
+    ) -> List[Any]:
         """
         Computes the query embedding using OpenAI's embedding process (which returns a 1536-dimensional vector),
-        constructs a QueryWithEmbedding (which now may include optional collection-specific top_k values),
+        constructs a QueryWithEmbedding (which now may include optional collection-specific top_k values and filters),
         and then performs a multi-collection query.
         """
         try:
@@ -374,17 +378,16 @@ class MultiCollectionRetriever:
         except Exception as e:
             raise Exception("Error obtaining embeddings: " + str(e))
         
-        # Here we assume that QueryWithEmbedding now includes the optional fields:
-        # top_k_programs, top_k_courses, and top_k_attributes.
         from models.models import QueryWithEmbedding
         query_obj = QueryWithEmbedding(
             query=query_text,
             embedding=query_embedding,
             top_k=self.k,
+            # Optionally, you could also set:
             # top_k_programs=3,
             # top_k_courses=10,
             # top_k_attributes=7,
-            filter=None
+            filter=query_filter  # Pass the filter here.
         )
         results = await self.datastore.multi_query([query_obj])
         return results[0].results if results else []
