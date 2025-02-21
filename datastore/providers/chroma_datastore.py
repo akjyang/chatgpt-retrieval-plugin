@@ -296,61 +296,68 @@ class ChromaDataStore(DataStore):
         except Exception:
             return [self._collection.name]
 
-    # --- New multi-query method for querying across all collections ---
-    async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
-        """
-        For each query in queries, iterate over all collections in the client,
-        perform a similarity query (with n_results=k) on each, tag results with the
-        collection name, and then aggregate and sort them.
-        """
-        aggregated_results = []
-        # Get all collections from the client.
-        all_collections = self._client.list_collections()
-        for query in queries:
-            combined_results = []
-            for coll in all_collections:
-                # Use k = 5 per collection.
-                n_results = min(query.top_k if query.top_k else 5, coll.count() or 5)
-                result = coll.query(
-                    query_embeddings=[query.embedding],
-                    include=["documents", "distances", "metadatas"],
-                    n_results=n_results,
-                    where=(self._where_from_query_filter(query.filter) if query.filter else {}),
-                )
-                # The Chroma query returns each field wrapped in a list/tuple;
-                if result and result.get("ids"):
-                    # Here we assume result["ids"] is a list with one element: a list of ids.
-                    ids = result["ids"][0]
-                    documents = result["documents"][0]
-                    metadatas = result["metadatas"][0]
-                    distances = result["distances"][0]
-                    for id_, doc_text, meta, distance in zip(ids, documents, metadatas, distances):
-                        # Tag each result with its source collection.
-                        meta["source_collection"] = coll.name
-                        # Create a ChinguDocumentChunkWithScore object.
-                        from models.models import ChinguDocumentChunkWithScore, ChinguDocumentChunkMetadata
-                        # Process metadata (using our helper)
-                        processed_meta = self._chingu_process_metadata_from_storage(meta)
-                        combined_results.append(
-                            ChinguDocumentChunkWithScore(
-                                id=id_,
-                                text=doc_text,
-                                metadata=processed_meta,
-                                score=distance,
-                            )
-                        )
-            # Optionally, sort combined_results by score (assuming lower is better)
-            combined_results.sort(key=lambda x: x.score)
-            from models.models import QueryResult
-            aggregated_results.append(QueryResult(query=query.query, results=combined_results))
-        return aggregated_results
+    # --- Revised multi-query method for querying across all collections ---
+async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
+    """
+    For each query in queries, iterate over all collections in the client,
+    perform a similarity query on each using a collection-specific n_results,
+    tag results with the collection name, and then aggregate and sort them.
+    """
+    aggregated_results = []
+    # Get all collections from the client.
+    all_collections = self._client.list_collections()
+    for query in queries:
+        combined_results = []
+        for coll in all_collections:
+            coll_name = coll.name.lower()
+            # Determine the k value based on the collection name and the query parameters.
+            if coll_name == "programs":
+                coll_k = query.top_k_programs if hasattr(query, "top_k_programs") and query.top_k_programs is not None else (query.top_k if query.top_k is not None else 5)
+            elif coll_name == "courses":
+                coll_k = query.top_k_courses if hasattr(query, "top_k_courses") and query.top_k_courses is not None else (query.top_k if query.top_k is not None else 5)
+            elif coll_name in ("attributes", "attributes_flat", "attributes_grouped"):
+                coll_k = query.top_k_attributes if hasattr(query, "top_k_attributes") and query.top_k_attributes is not None else (query.top_k if query.top_k is not None else 5)
+            else:
+                coll_k = query.top_k if query.top_k is not None else 5
 
-# --- New helper retriever class ---
+            # Ensure we do not request more than the collection's count.
+            n_results = min(coll_k, coll.count() or coll_k)
+            result = coll.query(
+                query_embeddings=[query.embedding],
+                include=["documents", "distances", "metadatas"],
+                n_results=n_results,
+                where=(self._where_from_query_filter(query.filter) if query.filter else {}),
+            )
+            if result and result.get("ids"):
+                ids = result["ids"][0]
+                documents = result["documents"][0]
+                metadatas = result["metadatas"][0]
+                distances = result["distances"][0]
+                for id_, doc_text, meta, distance in zip(ids, documents, metadatas, distances):
+                    # Tag each result with its source collection.
+                    meta["source_collection"] = coll.name
+                    from models.models import ChinguDocumentChunkWithScore
+                    processed_meta = self._chingu_process_metadata_from_storage(meta)
+                    combined_results.append(
+                        ChinguDocumentChunkWithScore(
+                            id=id_,
+                            text=doc_text,
+                            metadata=processed_meta,
+                            score=distance,
+                        )
+                    )
+        # Sort combined_results by score (assuming lower is better).
+        combined_results.sort(key=lambda x: x.score)
+        from models.models import QueryResult
+        aggregated_results.append(QueryResult(query=query.query, results=combined_results))
+    return aggregated_results
+
+# --- Revised helper retriever class ---
 class MultiCollectionRetriever:
     def __init__(self, datastore: "ChromaDataStore", k: int = 5):
         """
         :param datastore: An instance of ChromaDataStore.
-        :param k: Number of documents to return per collection.
+        :param k: Default number of documents to return per collection if no granular value is provided.
         """
         self.datastore = datastore
         self.k = k
@@ -358,19 +365,23 @@ class MultiCollectionRetriever:
     async def get_relevant_documents(self, query_text: str) -> List[Any]:
         """
         Computes the query embedding using OpenAI's embedding process (which returns a 1536-dimensional vector),
-        constructs a QueryWithEmbedding, and then performs a multi-collection query.
+        constructs a QueryWithEmbedding (which now may include optional collection-specific top_k values),
+        and then performs a multi-collection query.
         """
         try:
             # Compute the embedding using your real embedding function.
-            # This call should return an embedding with 1536 dimensions.
             query_embedding = get_embeddings([query_text])[0]
         except Exception as e:
             raise Exception("Error obtaining embeddings: " + str(e))
         
+        # Here we assume that QueryWithEmbedding now includes the optional fields:
+        # top_k_programs, top_k_courses, and top_k_attributes.
+        from models.models import QueryWithEmbedding
         query_obj = QueryWithEmbedding(
             query=query_text,
             embedding=query_embedding,
-            top_k=self.k,
+            top_k=self.k,  # Default top_k if not overridden
+            # Optional: you could also pass default values for the granular fields here.
             filter=None
         )
         results = await self.datastore.multi_query([query_obj])
