@@ -281,6 +281,13 @@ class ChromaDataStore(DataStore):
             }
         except Exception as e:
             return {"error": str(e)}
+        
+    async def list_collections(self) -> List[str]:
+        try:
+            collections = self._client.list_collections()
+            return [collection.name for collection in collections]
+        except Exception:
+            return [self._collection.name]
 
     async def get_document(self, document_id: str) -> Optional[Document]:
         result = self._collection.query(
@@ -294,13 +301,6 @@ class ChromaDataStore(DataStore):
         metadata_dict = result["metadatas"][0]
         metadata = self._process_metadata_from_storage(metadata_dict)
         return Document(id=doc_id, text=text, metadata=metadata)
-
-    async def list_collections(self) -> List[str]:
-        try:
-            collections = self._client.list_collections()
-            return [collection.name for collection in collections]
-        except Exception:
-            return [self._collection.name]
 
     # --- Revised multi-query method for querying across all collections ---
     async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:

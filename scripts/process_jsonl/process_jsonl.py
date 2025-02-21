@@ -7,6 +7,7 @@ import asyncio
 from models.models import Document, DocumentMetadata
 from datastore.datastore import DataStore
 from datastore.factory import get_datastore
+
 from services.extract_metadata import extract_metadata_from_document
 from services.pii_detection import screen_text_for_pii
 
@@ -51,6 +52,7 @@ async def process_jsonl_dump(
                 print("No document text, skipping...")
                 continue
 
+            print("Item", item)
             # Build metadata dictionary from top-level keys
             metadata_dict = {
                 "source": item.get("source", None),
@@ -64,11 +66,13 @@ async def process_jsonl_dump(
             if "metadata" in item and isinstance(item["metadata"], dict):
                 metadata_dict.update(item["metadata"])
 
+            print("Metadata dict", metadata_dict)
             # Create the initial metadata object using the combined dictionary
             metadata = DocumentMetadata(**metadata_dict)
             # Merge in the custom metadata (this works even if the key wasn't defined)
-            metadata = metadata.copy(update=custom_metadata)            
+            metadata = metadata.model_copy(update=custom_metadata)            
 
+            screen_for_pii=False
             if screen_for_pii:
                 pii_detected = screen_text_for_pii(text)
                 if pii_detected:
@@ -76,6 +80,7 @@ async def process_jsonl_dump(
                     skipped_items.append(item)
                     continue
 
+            extract_metadata=False
             if extract_metadata:
                 extracted_metadata = extract_metadata_from_document(
                     f"Text: {text}; Metadata: {str(metadata)}"
@@ -83,6 +88,7 @@ async def process_jsonl_dump(
                 # Update the metadata with the extracted values (allowing extra fields)
                 metadata = DocumentMetadata(**extracted_metadata)
 
+            print("Metadata", metadata)
             # Create the document object with id, text, and updated metadata
             document = Document(
                 id=doc_id,
