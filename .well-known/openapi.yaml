@@ -1,22 +1,27 @@
-openapi: 3.0.2
+openapi: 3.1.0
 info:
-  title: Retrieval Plugin API
-  description: A retrieval API for querying and filtering documents based on natural language queries and metadata
+  title: Penn Academic Planner Retrieval API
+  description: >
+    This API supports academic course planning by allowing Penn students to query and filter
+    documents (including programs, courses, and related attributes) using natural language queries
+    and detailed metadata filters. Results are aggregated across multiple collections (5 per collection by default).
   version: 1.0.0
 servers:
-  - url: https://your-app-url.com
+  - url: https://chatgpt-retrieval-plugin-9phi.onrender.com
 paths:
   /query:
     post:
-      summary: Query
-      description: Accepts search query objects array each with query and optional filter. Break down complex questions into sub-questions. Refine results by criteria, e.g. time / source, don't do this often. Split queries if ResponseTooLargeError occurs.
+      summary: Search for Academic Information
+      description: >
+        Accepts an array of query objects—each with a query string and an optional metadata filter—
+        and aggregates results from all collections (5 results per collection by default).
       operationId: query_query_post
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               $ref: "#/components/schemas/QueryRequest"
-        required: true
       responses:
         "200":
           description: Successful Response
@@ -34,62 +39,74 @@ paths:
         - HTTPBearer: []
 components:
   schemas:
-    DocumentChunkMetadata:
-      title: DocumentChunkMetadata
+    ChinguDocumentChunkMetadata:
+      title: ChinguDocumentChunkMetadata
       type: object
       properties:
-        source:
-          $ref: "#/components/schemas/Source"
-        source_id:
-          title: Source Id
+        doc_type:
+          title: Doc Type (programs, courses, or attributes)
           type: string
-        url:
-          title: Url
+        course_code:
+          title: Course Code
           type: string
-        created_at:
-          title: Created At
+        course_title:
+          title: Course Title
           type: string
-        author:
-          title: Author
+        course_unit:
+          title: Course Units
           type: string
-        document_id:
-          title: Document Id
+        term:
+          title: Term (e.g., Fall 2024 or Spring 2025)
           type: string
-    DocumentChunkWithScore:
-      title: DocumentChunkWithScore
-      required:
-        - text
-        - metadata
-        - score
-      type: object
-      properties:
-        id:
-          title: Id
+        attribute:
+          title: Attribute (e.g., requirement fulfilled)
           type: string
-        text:
-          title: Text
+        program_url:
+          title: Program URL
           type: string
-        metadata:
-          $ref: "#/components/schemas/DocumentChunkMetadata"
-        embedding:
-          title: Embedding
+        academic_level:
+          title: Academic Level (Undergraduate or Graduate)
+          type: string
+        school:
+          title: School
+          type: string
+        format:
+          title: Format (On-Campus or Online/Hybrid)
+          type: string
+        major_minor:
+          title: Major/Minor
+          type: string
+        degree:
+          title: Degree (Bachelor's or Master's)
+          type: string
+        requirements:
+          title: Requirements (e.g., courses needed)
           type: array
           items:
-            type: number
-        score:
-          title: Score
-          type: number
+            type: object
+        subject_url:
+          title: Subject URL
+          type: string
+        course_code_no:
+          title: Course Code Number
+          type: integer
+        instructor:
+          title: Instructor Name (first initial plus last name)
+          type: string
+        source:
+          title: Source
+          type: string
     DocumentMetadataFilter:
       title: DocumentMetadataFilter
       type: object
       properties:
         document_id:
-          title: Document Id
+          title: Document ID
           type: string
         source:
           $ref: "#/components/schemas/Source"
         source_id:
-          title: Source Id
+          title: Source ID
           type: string
         author:
           title: Author
@@ -97,8 +114,91 @@ components:
         start_date:
           title: Start Date
           type: string
+          format: date-time
         end_date:
           title: End Date
+          type: string
+          format: date-time
+        doc_type:
+          title: Doc Type (programs, courses, or attributes)
+          type: string
+        course_code:
+          title: Course Code
+          type: string
+        course_title:
+          title: Course Title
+          type: string
+        course_unit:
+          title: Course Units
+          type: string
+        term:
+          title: Term (e.g., Fall 2024 or Spring 2025)
+          type: string
+        attribute:
+          title: Attribute (e.g., requirement fulfilled)
+          type: string
+        program_url:
+          title: Program URL
+          type: string
+        academic_level:
+          title: Academic Level (Undergraduate or Graduate)
+          type: string
+        school:
+          title: School
+          type: string
+        format:
+          title: Format (On-Campus or Online/Hybrid)
+          type: string
+        major_minor:
+          title: Major/Minor
+          type: string
+        degree:
+          title: Degree (Bachelor's or Master's)
+          type: string
+        requirements:
+          title: Requirements (e.g., courses needed)
+          type: array
+          items:
+            type: object
+        subject_url:
+          title: Subject URL
+          type: string
+        course_code_no:
+          title: Course Code Number
+          type: integer
+        instructor:
+          title: Instructor Name (first initial plus last name)
+          type: string
+    Source:
+      title: Source
+      type: string
+      enum:
+        - email
+        - file
+        - chat
+        - programs
+        - courses
+        - attributes_flat
+        - attributes_grouped
+        - courses_term
+    ValidationError:
+      title: ValidationError
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          title: Location
+          type: array
+          items:
+            type: string
+        msg:
+          title: Message
+          type: string
+        type:
+          title: Error Type
           type: string
     HTTPValidationError:
       title: HTTPValidationError
@@ -111,9 +211,9 @@ components:
             $ref: "#/components/schemas/ValidationError"
     Query:
       title: Query
+      type: object
       required:
         - query
-      type: object
       properties:
         query:
           title: Query
@@ -121,37 +221,38 @@ components:
         filter:
           $ref: "#/components/schemas/DocumentMetadataFilter"
         top_k:
-          title: Top K
+          title: Top K (Default for collections not specified)
+          type: integer
+          default: 5
+        top_k_programs:
+          title: Top K for Programs
           type: integer
           default: 3
+        top_k_courses:
+          title: Top K for Courses
+          type: integer
+          default: 10
+        top_k_attributes:
+          title: Top K for Attributes
+          type: integer
+          default: 7
     QueryRequest:
       title: QueryRequest
+      type: object
       required:
         - queries
-      type: object
       properties:
         queries:
           title: Queries
           type: array
           items:
             $ref: "#/components/schemas/Query"
-    QueryResponse:
-      title: QueryResponse
-      required:
-        - results
-      type: object
-      properties:
-        results:
-          title: Results
-          type: array
-          items:
-            $ref: "#/components/schemas/QueryResult"
     QueryResult:
       title: QueryResult
+      type: object
       required:
         - query
         - results
-      type: object
       properties:
         query:
           title: Query
@@ -161,35 +262,41 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DocumentChunkWithScore"
-    Source:
-      title: Source
-      enum:
-        - email
-        - file
-        - chat
-      type: string
-      description: An enumeration.
-    ValidationError:
-      title: ValidationError
-      required:
-        - loc
-        - msg
-        - type
+    DocumentChunkWithScore:
+      title: DocumentChunkWithScore
       type: object
+      required:
+        - text
+        - metadata
+        - score
       properties:
-        loc:
-          title: Location
+        id:
+          title: ID
+          type: string
+        text:
+          title: Text
+          type: string
+        metadata:
+          $ref: "#/components/schemas/ChinguDocumentChunkMetadata"
+        embedding:
+          title: Embedding
           type: array
           items:
-            anyOf:
-              - type: string
-              - type: integer
-        msg:
-          title: Message
-          type: string
-        type:
-          title: Error Type
-          type: string
+            type: number
+        score:
+          title: Score
+          type: number
+    QueryResponse:
+      title: QueryResponse
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          title: Results
+          type: array
+          items:
+            $ref: "#/components/schemas/QueryResult"
   securitySchemes:
     HTTPBearer:
       type: http

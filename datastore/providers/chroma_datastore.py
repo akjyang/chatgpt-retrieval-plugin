@@ -297,60 +297,60 @@ class ChromaDataStore(DataStore):
             return [self._collection.name]
 
     # --- Revised multi-query method for querying across all collections ---
-async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
-    """
-    For each query in queries, iterate over all collections in the client,
-    perform a similarity query on each using a collection-specific n_results,
-    tag results with the collection name, and then aggregate and sort them.
-    """
-    aggregated_results = []
-    # Get all collections from the client.
-    all_collections = self._client.list_collections()
-    for query in queries:
-        combined_results = []
-        for coll in all_collections:
-            coll_name = coll.name.lower()
-            # Determine the k value based on the collection name and the query parameters.
-            if coll_name == "programs":
-                coll_k = query.top_k_programs if hasattr(query, "top_k_programs") and query.top_k_programs is not None else (query.top_k if query.top_k is not None else 5)
-            elif coll_name == "courses":
-                coll_k = query.top_k_courses if hasattr(query, "top_k_courses") and query.top_k_courses is not None else (query.top_k if query.top_k is not None else 5)
-            elif coll_name in ("attributes", "attributes_flat", "attributes_grouped"):
-                coll_k = query.top_k_attributes if hasattr(query, "top_k_attributes") and query.top_k_attributes is not None else (query.top_k if query.top_k is not None else 5)
-            else:
-                coll_k = query.top_k if query.top_k is not None else 5
+    async def multi_query(self, queries: List[QueryWithEmbedding]) -> List[QueryResult]:
+        """
+        For each query in queries, iterate over all collections in the client,
+        perform a similarity query on each using a collection-specific n_results,
+        tag results with the collection name, and then aggregate and sort them.
+        """
+        aggregated_results = []
+        # Get all collections from the client.
+        all_collections = self._client.list_collections()
+        for query in queries:
+            combined_results = []
+            for coll in all_collections:
+                coll_name = coll.name.lower()
+                # Determine the k value based on the collection name and the query parameters.
+                if coll_name == "programs":
+                    coll_k = query.top_k_programs if hasattr(query, "top_k_programs") and query.top_k_programs is not None else (query.top_k if query.top_k is not None else 5)
+                elif coll_name == "courses":
+                    coll_k = query.top_k_courses if hasattr(query, "top_k_courses") and query.top_k_courses is not None else (query.top_k if query.top_k is not None else 5)
+                elif coll_name in ("attributes", "attributes_flat", "attributes_grouped"):
+                    coll_k = query.top_k_attributes if hasattr(query, "top_k_attributes") and query.top_k_attributes is not None else (query.top_k if query.top_k is not None else 5)
+                else:
+                    coll_k = query.top_k if query.top_k is not None else 5
 
-            # Ensure we do not request more than the collection's count.
-            n_results = min(coll_k, coll.count() or coll_k)
-            result = coll.query(
-                query_embeddings=[query.embedding],
-                include=["documents", "distances", "metadatas"],
-                n_results=n_results,
-                where=(self._where_from_query_filter(query.filter) if query.filter else {}),
-            )
-            if result and result.get("ids"):
-                ids = result["ids"][0]
-                documents = result["documents"][0]
-                metadatas = result["metadatas"][0]
-                distances = result["distances"][0]
-                for id_, doc_text, meta, distance in zip(ids, documents, metadatas, distances):
-                    # Tag each result with its source collection.
-                    meta["source_collection"] = coll.name
-                    from models.models import ChinguDocumentChunkWithScore
-                    processed_meta = self._chingu_process_metadata_from_storage(meta)
-                    combined_results.append(
-                        ChinguDocumentChunkWithScore(
-                            id=id_,
-                            text=doc_text,
-                            metadata=processed_meta,
-                            score=distance,
+                # Ensure we do not request more than the collection's count.
+                n_results = min(coll_k, coll.count() or coll_k)
+                result = coll.query(
+                    query_embeddings=[query.embedding],
+                    include=["documents", "distances", "metadatas"],
+                    n_results=n_results,
+                    where=(self._where_from_query_filter(query.filter) if query.filter else {}),
+                )
+                if result and result.get("ids"):
+                    ids = result["ids"][0]
+                    documents = result["documents"][0]
+                    metadatas = result["metadatas"][0]
+                    distances = result["distances"][0]
+                    for id_, doc_text, meta, distance in zip(ids, documents, metadatas, distances):
+                        # Tag each result with its source collection.
+                        meta["source_collection"] = coll.name
+                        from models.models import ChinguDocumentChunkWithScore
+                        processed_meta = self._chingu_process_metadata_from_storage(meta)
+                        combined_results.append(
+                            ChinguDocumentChunkWithScore(
+                                id=id_,
+                                text=doc_text,
+                                metadata=processed_meta,
+                                score=distance,
+                            )
                         )
-                    )
-        # Sort combined_results by score (assuming lower is better).
-        combined_results.sort(key=lambda x: x.score)
-        from models.models import QueryResult
-        aggregated_results.append(QueryResult(query=query.query, results=combined_results))
-    return aggregated_results
+            # Sort combined_results by score (assuming lower is better).
+            combined_results.sort(key=lambda x: x.score)
+            from models.models import QueryResult
+            aggregated_results.append(QueryResult(query=query.query, results=combined_results))
+        return aggregated_results
 
 # --- Revised helper retriever class ---
 class MultiCollectionRetriever:
