@@ -381,9 +381,9 @@ class MultiCollectionRetriever:
             query=query_text,
             embedding=query_embedding,
             top_k=self.k,
-            top_k_programs=3,
-            top_k_courses=10,
-            top_k_attributes=7,
+            # top_k_programs=3,
+            # top_k_courses=10,
+            # top_k_attributes=7,
             filter=None
         )
         results = await self.datastore.multi_query([query_obj])
