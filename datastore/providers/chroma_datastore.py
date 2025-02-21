@@ -53,6 +53,7 @@ class ChromaDataStore(DataStore):
     ):
         print("CHROMA IN MEMORY:", in_memory)
         print(type(in_memory)) # "FALSE"
+        in_memory = False if in_memory.lower() == "false" else True
         if client:
             self._client = client
         else:
