@@ -380,8 +380,10 @@ class MultiCollectionRetriever:
         query_obj = QueryWithEmbedding(
             query=query_text,
             embedding=query_embedding,
-            top_k=self.k,  # Default top_k if not overridden
-            # Optional: you could also pass default values for the granular fields here.
+            top_k=self.k,
+            top_k_programs=3,
+            top_k_courses=10,
+            top_k_attributes=7,
             filter=None
         )
         results = await self.datastore.multi_query([query_obj])
