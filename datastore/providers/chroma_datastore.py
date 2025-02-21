@@ -51,10 +51,12 @@ class ChromaDataStore(DataStore):
         port: str = CHROMA_PORT,
         client: Optional[chromadb.Client] = None,
     ):
+        print("CHROMA IN MEMORY:", in_memory)
         if client:
             self._client = client
         else:
             if in_memory:
+                print("Using in-memory ChromaDB")
                 settings = (
                     Settings(
                         chroma_db_impl="duckdb+parquet",
@@ -65,6 +67,7 @@ class ChromaDataStore(DataStore):
                 )
                 self._client = chromadb.Client(settings=settings)
             else:
+                print("NOT Using in-memory ChromaDB")
                 self._client = chromadb.Client(
                     settings=Settings(
                         chroma_api_impl="rest",
