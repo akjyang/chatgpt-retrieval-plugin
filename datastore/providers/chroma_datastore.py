@@ -155,35 +155,37 @@ class ChromaDataStore(DataStore):
         return True
 
     def _where_from_query_filter(self, query_filter: DocumentMetadataFilter) -> Dict:
-        output = {
-            k: v
-            for (k, v) in query_filter.dict().items()
-            if v is not None and k not in ("start_date", "end_date", "source")
-        }
+        conditions = []
+        # Add the flat keys that aren't start_date, end_date, or source.
+        for k, v in query_filter.dict().items():
+            if v is not None and k not in ("start_date", "end_date", "source"):
+                conditions.append({k: v})
+        # Add the source if provided.
         if query_filter.source:
-            output["source"] = query_filter.source.value
+            conditions.append({"source": query_filter.source.value})
+        # Handle date filters.
         if query_filter.start_date and query_filter.end_date:
-            output["$and"] = [
-                {
-                    "created_at": {
-                        "$gte": int(datetime.fromisoformat(query_filter.start_date).timestamp())
-                    }
-                },
-                {
-                    "created_at": {
-                        "$lte": int(datetime.fromisoformat(query_filter.end_date).timestamp())
-                    }
-                },
-            ]
+            conditions.extend([
+                {"created_at": {"$gte": int(datetime.fromisoformat(query_filter.start_date).timestamp())}},
+                {"created_at": {"$lte": int(datetime.fromisoformat(query_filter.end_date).timestamp())}}
+            ])
         elif query_filter.start_date:
-            output["created_at"] = {
-                "$gte": int(datetime.fromisoformat(query_filter.start_date).timestamp())
-            }
+            conditions.append({
+                "created_at": {"$gte": int(datetime.fromisoformat(query_filter.start_date).timestamp())}
+            })
         elif query_filter.end_date:
-            output["created_at"] = {
-                "$lte": int(datetime.fromisoformat(query_filter.end_date).timestamp())
-            }
-        return output
+            conditions.append({
+                "created_at": {"$lte": int(datetime.fromisoformat(query_filter.end_date).timestamp())}
+            })
+
+        # If only one condition exists, return it directly; if multiple, wrap in $and.
+        if len(conditions) == 1:
+            return conditions[0]
+        elif len(conditions) > 1:
+            return {"$and": conditions}
+        else:
+            return {}
+
 
     def _process_metadata_for_storage(self, metadata: Any) -> Dict:
         stored_metadata = {}
