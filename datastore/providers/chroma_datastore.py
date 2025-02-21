@@ -91,6 +91,9 @@ class ChromaDataStore(DataStore):
         into its respective collection. Returns a flat list of document chunk ids.
         """
         groups: Dict[str, List[Document]] = defaultdict(list)
+        print("__UPSERT__")
+        print("documents", documents)
+        
         for doc in documents:
             raw_doc_type = doc.metadata.doc_type if doc.metadata and getattr(doc.metadata, "doc_type", None) else self._collection.name
             doc_type = sanitize_id(raw_doc_type)
