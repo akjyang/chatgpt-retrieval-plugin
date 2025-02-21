@@ -196,19 +196,35 @@ class ChromaDataStore(DataStore):
         if metadata.url:
             stored_metadata["url"] = metadata.url
         if metadata.created_at:
-            stored_metadata["created_at"] = int(
-                datetime.fromisoformat(metadata.created_at).timestamp()
-            )
+            stored_metadata["created_at"] = int(datetime.fromisoformat(metadata.created_at).timestamp())
         if metadata.author:
             stored_metadata["author"] = metadata.author
         if metadata.document_id:
             stored_metadata["document_id"] = metadata.document_id
-        # Preserve additional keys (e.g., doc_type, course_code, etc.)
-        extra_keys = ["doc_type", "course_code", "course_title", "term", "attribute"]
+        # Preserve all relevant extra keys.
+        extra_keys = [
+            "doc_type",
+            "course_code",
+            "course_title",
+            "course_unit",
+            "term",
+            "attribute",
+            "program_url",
+            "academic_level",
+            "school",
+            "format",
+            "major_minor",
+            "degree",
+            "requirements",
+            "subject_url",
+            "course_code_no",
+            "instructor"
+        ]
         for key in extra_keys:
             if hasattr(metadata, key) and getattr(metadata, key) is not None:
                 stored_metadata[key] = getattr(metadata, key)
         return stored_metadata
+
 
     def _process_metadata_from_storage(self, metadata: Dict) -> Any:
         # Reconstruct metadata for general document chunks.
