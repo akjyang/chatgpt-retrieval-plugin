@@ -357,13 +357,21 @@ class MultiCollectionRetriever:
 
     async def get_relevant_documents(self, query_text: str) -> List[Any]:
         """
-        Embed the query using the OpenAI embedding process and then perform a multi-collection
-        query. Returns aggregated results from all collections.
+        Computes the query embedding using OpenAI's embedding process (which returns a 1536-dimensional vector),
+        constructs a QueryWithEmbedding, and then performs a multi-collection query.
         """
-        # Use the get_embeddings function from services.openai to obtain the query embedding.
-        # get_embeddings is synchronous, so you may run it in a thread pool if needed.
-        query_embedding = get_embeddings([query_text])[0]  # This should return an embedding of dimension 1536.
+        try:
+            # Compute the embedding using your real embedding function.
+            # This call should return an embedding with 1536 dimensions.
+            query_embedding = get_embeddings([query_text])[0]
+        except Exception as e:
+            raise Exception("Error obtaining embeddings: " + str(e))
         
-        query_obj = QueryWithEmbedding(query=query_text, embedding=query_embedding, top_k=self.k, filter=None)
+        query_obj = QueryWithEmbedding(
+            query=query_text,
+            embedding=query_embedding,
+            top_k=self.k,
+            filter=None
+        )
         results = await self.datastore.multi_query([query_obj])
         return results[0].results if results else []
