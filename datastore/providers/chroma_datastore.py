@@ -52,6 +52,7 @@ class ChromaDataStore(DataStore):
         client: Optional[chromadb.Client] = None,
     ):
         print("CHROMA IN MEMORY:", in_memory)
+        print(type(in_memory)) # "FALSE"
         if client:
             self._client = client
         else:
