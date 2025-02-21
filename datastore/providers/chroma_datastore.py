@@ -201,28 +201,16 @@ class ChromaDataStore(DataStore):
             stored_metadata["author"] = metadata.author
         if metadata.document_id:
             stored_metadata["document_id"] = metadata.document_id
-        # Preserve all relevant extra keys.
-        extra_keys = [
-            "doc_type",
-            "course_code",
-            "course_title",
-            "course_unit",
-            "term",
-            "attribute",
-            "program_url",
-            "academic_level",
-            "school",
-            "format",
-            "major_minor",
-            "degree",
-            "requirements",
-            "subject_url",
-            "course_code_no",
-            "instructor"
-        ]
-        for key in extra_keys:
-            if hasattr(metadata, key) and getattr(metadata, key) is not None:
-                stored_metadata[key] = getattr(metadata, key)
+
+        # Get all the fields from the model (including extras)
+        full_meta = metadata.dict()
+        # Define the base keys we already handled
+        base_keys = {"source", "source_id", "url", "created_at", "author", "document_id"}
+        # Merge any extra keys (or even the ones defined in the model) that have a non-null value.
+        for key, value in full_meta.items():
+            if key not in base_keys and value is not None:
+                stored_metadata[key] = value
+
         return stored_metadata
 
 
