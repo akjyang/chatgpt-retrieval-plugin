@@ -4,7 +4,7 @@ info:
   description: >
     This API supports academic course planning by allowing Penn students to query and filter
     documents (including programs, courses, and related attributes) using natural language queries
-    and detailed metadata filters. Results are aggregated across multiple collections (5 per collection by default).
+    and detailed metadata filters. Results are aggregated across multiple collections.
   version: 1.0.0
 servers:
   - url: https://chatgpt-retrieval-plugin-9phi.onrender.com
@@ -13,8 +13,8 @@ paths:
     post:
       summary: Search for Academic Information
       description: >
-        Accepts an array of query objects—each with a query string and an optional metadata filter—
-        and aggregates results from all collections (5 results per collection by default).
+        Accepts an array of query objects—each with a query string, an optional metadata filter,
+        and custom top_k values—to aggregate results from all collections using the specified parameters.
       operationId: query_query_post
       requestBody:
         required: true
@@ -44,7 +44,7 @@ components:
       type: object
       properties:
         doc_type:
-          title: Doc Type (programs, courses, or attributes)
+          title: Doc Type (e.g., course, attribute, program)
           type: string
         course_code:
           title: Course Code
@@ -53,37 +53,35 @@ components:
           title: Course Title
           type: string
         course_unit:
-          title: Course Units
+          title: Course Unit
           type: string
         term:
-          title: Term (e.g., Fall 2024 or Spring 2025)
+          title: Term (e.g., Fall 2023, Spring 2024)
           type: string
         attribute:
-          title: Attribute (e.g., requirement fulfilled)
+          title: Attribute
           type: string
         program_url:
           title: Program URL
           type: string
         academic_level:
-          title: Academic Level (Undergraduate or Graduate)
+          title: Academic Level
           type: string
         school:
           title: School
           type: string
         format:
-          title: Format (On-Campus or Online/Hybrid)
+          title: Format (On-Campus, Online/Hybrid)
           type: string
         major_minor:
-          title: Major/Minor
+          title: Major/Minor (Major, Minor)
           type: string
         degree:
-          title: Degree (Bachelor's or Master's)
+          title: Degree
           type: string
         requirements:
           title: Requirements (e.g., courses needed)
-          type: array
-          items:
-            type: object
+          type: string
         subject_url:
           title: Subject URL
           type: string
@@ -91,7 +89,7 @@ components:
           title: Course Code Number
           type: integer
         instructor:
-          title: Instructor Name (first initial plus last name)
+          title: Instructor (First name initial, period, space, then last name)
           type: string
         source:
           title: Source
@@ -120,7 +118,7 @@ components:
           type: string
           format: date-time
         doc_type:
-          title: Doc Type (programs, courses, or attributes)
+          title: Doc Type (e.g., course, attribute, program)
           type: string
         course_code:
           title: Course Code
@@ -129,37 +127,35 @@ components:
           title: Course Title
           type: string
         course_unit:
-          title: Course Units
+          title: Course Unit
           type: string
         term:
-          title: Term (e.g., Fall 2024 or Spring 2025)
+          title: Term (e.g., Fall 2023, Spring 2024)
           type: string
         attribute:
-          title: Attribute (e.g., requirement fulfilled)
+          title: Attribute
           type: string
         program_url:
           title: Program URL
           type: string
         academic_level:
-          title: Academic Level (Undergraduate or Graduate)
+          title: Academic Level
           type: string
         school:
           title: School
           type: string
         format:
-          title: Format (On-Campus or Online/Hybrid)
+          title: Format
           type: string
         major_minor:
           title: Major/Minor
           type: string
         degree:
-          title: Degree (Bachelor's or Master's)
+          title: Degree
           type: string
         requirements:
-          title: Requirements (e.g., courses needed)
-          type: array
-          items:
-            type: object
+          title: Requirements
+          type: string
         subject_url:
           title: Subject URL
           type: string
@@ -167,7 +163,7 @@ components:
           title: Course Code Number
           type: integer
         instructor:
-          title: Instructor Name (first initial plus last name)
+          title: Instructor (First name initial, period, space, then last name)
           type: string
     Source:
       title: Source
@@ -209,9 +205,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ValidationError"
-    Query:
-      title: Query
+    QueryInput:
+      title: QueryInput
       type: object
+      description: >
+        The input query model. If any of the top_k fields are omitted or set to 0, defaults are applied:
+        top_k defaults to 5, top_k_programs to 3, top_k_courses to 7, and top_k_attributes to 5.
       required:
         - query
       properties:
@@ -221,7 +220,7 @@ components:
         filter:
           $ref: "#/components/schemas/DocumentMetadataFilter"
         top_k:
-          title: Top K (Default for collections not specified)
+          title: Top K (Fallback for collections without a dedicated value)
           type: integer
           default: 5
         top_k_programs:
@@ -246,7 +245,7 @@ components:
           title: Queries
           type: array
           items:
-            $ref: "#/components/schemas/Query"
+            $ref: "#/components/schemas/QueryInput"
     QueryResult:
       title: QueryResult
       type: object

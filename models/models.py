@@ -131,8 +131,8 @@ class QueryInput(BaseModel):
         defaults = {
             'top_k': 5,
             'top_k_programs': 3,
-            'top_k_courses': 10,
-            'top_k_attributes': 7,
+            'top_k_courses': 7,
+            'top_k_attributes': 5,
         }
         # If the value is None or 0, use the default.
         if v is None or (isinstance(v, int) and v == 0):
