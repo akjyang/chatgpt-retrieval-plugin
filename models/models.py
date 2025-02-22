@@ -98,7 +98,7 @@ class DocumentMetadataFilter(BaseModel):
     format: Optional[str] = None
     major_minor: Optional[str] = None
     degree: Optional[str] = None
-    requirements: Optional[List[dict]] = None
+    requirements: Optional[str] = None
     subject_url: Optional[str] = None
     course_code_no: Optional[int] = None
     instructor: Optional[str] = None
