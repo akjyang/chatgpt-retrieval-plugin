@@ -121,7 +121,7 @@ class QueryResult(BaseModel):
 class QueryInput(BaseModel):
     query: str
     filter: Optional[DocumentMetadataFilter] = None
-    top_k: Optional[int] = 5
-    top_k_programs: Optional[int] = 3
-    top_k_courses: Optional[int] = 10
-    top_k_attributes: Optional[int] = 7
+    top_k: Optional[int]
+    top_k_programs: Optional[int]
+    top_k_courses: Optional[int]
+    top_k_attributes: Optional[int]
