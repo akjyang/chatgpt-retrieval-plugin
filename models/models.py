@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 from enum import Enum
 
@@ -121,7 +121,20 @@ class QueryResult(BaseModel):
 class QueryInput(BaseModel):
     query: str
     filter: Optional[DocumentMetadataFilter] = None
-    top_k: Optional[int]
-    top_k_programs: Optional[int]
-    top_k_courses: Optional[int]
-    top_k_attributes: Optional[int]
+    top_k: Optional[int] = 5
+    top_k_programs: Optional[int] = 3
+    top_k_courses: Optional[int] = 10
+    top_k_attributes: Optional[int] = 7
+
+    @field_validator('top_k', 'top_k_programs', 'top_k_courses', 'top_k_attributes', mode='before')
+    @classmethod
+    def replace_zero(cls, v, info):
+        defaults = {
+            'top_k': 5,
+            'top_k_programs': 3,
+            'top_k_courses': 10,
+            'top_k_attributes': 7,
+        }
+        if v is None or (isinstance(v, int) and v == 0):
+            return defaults[info.field_name]
+        return v
