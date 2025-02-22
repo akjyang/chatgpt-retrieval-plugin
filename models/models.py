@@ -86,8 +86,7 @@ class DocumentMetadataFilter(BaseModel):
     author: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    # Additional fields from ChinguDocumentChunkMetadata:
-    doc_type: Optional[str] = None         # e.g., "course", "attribute", "program"
+    doc_type: Optional[str] = None
     course_code: Optional[str] = None
     course_title: Optional[str] = None
     course_unit: Optional[str] = None
@@ -118,3 +117,11 @@ class QueryWithEmbedding(Query):
 class QueryResult(BaseModel):
     query: str
     results: List[ChinguDocumentChunkWithScore]
+
+class QueryInput(BaseModel):
+    query: str
+    filter: Optional[DocumentMetadataFilter] = None
+    top_k: Optional[int] = 5
+    top_k_programs: Optional[int] = 3
+    top_k_courses: Optional[int] = 10
+    top_k_attributes: Optional[int] = 7

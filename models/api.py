@@ -1,7 +1,7 @@
 from models.models import (
     Document,
     DocumentMetadataFilter,
-    Query,
+    QueryInput,
     QueryResult,
 )
 from pydantic import BaseModel
@@ -16,7 +16,7 @@ class UpsertResponse(BaseModel):
     ids: List[str]
 
 class QueryRequest(BaseModel):
-    queries: List[Query]
+    queries: List[QueryInput]
 
 class QueryResponse(BaseModel):
     results: List[QueryResult]

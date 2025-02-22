@@ -88,11 +88,10 @@ async def query_endpoint(request: QueryRequest = Body(...)):
             raise HTTPException(status_code=400, detail="No query provided")
         # Use the first query from the list.
         query_obj = request.queries[0]
-        query_text = query_obj.query
-        # Pass the filter along (it can be None if not provided)
-        results = await multi_retriever.get_relevant_documents(query_text, query_filter=query_obj.filter)
+        # Pass the entire query_obj to get_relevant_documents.
+        results = await multi_retriever.get_relevant_documents(query_obj)
         from models.models import QueryResult
-        query_result = QueryResult(query=query_text, results=results)
+        query_result = QueryResult(query=query_obj.query, results=results)
         return QueryResponse(results=[query_result])
     except Exception as e:
         print("Error:", e)

@@ -24,6 +24,7 @@ from models.models import (
     DocumentMetadataFilter,
     QueryResult,
     QueryWithEmbedding,
+    QueryInput,
     Source,
 )
 from services.chunks import get_document_chunks
@@ -378,30 +379,31 @@ class MultiCollectionRetriever:
 
     async def get_relevant_documents(
         self, 
-        query_text: str, 
-        query_filter: Optional[DocumentMetadataFilter] = None
+        query_obj: QueryInput
     ) -> List[Any]:
         """
-        Computes the query embedding using OpenAI's embedding process (which returns a 1536-dimensional vector),
-        constructs a QueryWithEmbedding (which now may include optional collection-specific top_k values and filters),
-        and then performs a multi-collection query.
+        Computes the query embedding, constructs a QueryWithEmbedding (including custom top_k values),
+        and performs a multi-collection query.
         """
+        query_text = query_obj.query
+        query_filter = query_obj.filter
+        
         try:
-            # Compute the embedding using your real embedding function.
             query_embedding = get_embeddings([query_text])[0]
         except Exception as e:
             raise Exception("Error obtaining embeddings: " + str(e))
         
         from models.models import QueryWithEmbedding
-        query_obj = QueryWithEmbedding(
+        # Create the QueryWithEmbedding object with client-specified values.
+        query_with_embedding = QueryWithEmbedding(
             query=query_text,
             embedding=query_embedding,
-            top_k=self.k,
-            # Optionally, you could also set:
-            # top_k_programs=3,
-            # top_k_courses=10,
-            # top_k_attributes=7,
-            filter=query_filter  # Pass the filter here.
+            top_k=query_obj.top_k,  # This could be useful as a fallback.
+            top_k_programs=query_obj.top_k_programs,
+            top_k_courses=query_obj.top_k_courses,
+            top_k_attributes=query_obj.top_k_attributes,
+            filter=query_filter
         )
-        results = await self.datastore.multi_query([query_obj])
+        
+        results = await self.datastore.multi_query([query_with_embedding])
         return results[0].results if results else []
