@@ -259,7 +259,7 @@ class ChromaDataStore(DataStore):
             major_minor=metadata.get("major_minor", None),
             degree=metadata.get("degree", None),
             
-            requirements=metadata.get("requirements", []),
+            requirements=metadata.get("requirements", None),
 
             subject_url=metadata.get("subject_url", None),
             course_code_no=metadata.get("course_code_no", None),
