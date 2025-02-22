@@ -13,6 +13,15 @@ from services.pii_detection import screen_text_for_pii
 
 DOCUMENT_UPSERT_BATCH_SIZE = 50
 
+def serialize_metadata(meta):
+    simple_meta = {}
+    for key, value in meta.items():
+        if not isinstance(value, (str, int, float)) and value is not None:
+            simple_meta[key] = json.dumps(value)
+        else:
+            simple_meta[key] = value
+    return simple_meta
+
 async def process_jsonl_dump(
     filepath: str,
     datastore: DataStore,
@@ -69,6 +78,7 @@ async def process_jsonl_dump(
             print("Metadata dict", metadata_dict)
             # Merge the parsed metadata and custom metadata into one dict:
             combined_metadata = {**metadata_dict, **custom_metadata}
+            combined_metadata = serialize_metadata(combined_metadata)
             # Create the metadata instance once with the merged dictionary:
             metadata = DocumentMetadata(**combined_metadata)         
             screen_for_pii=False
