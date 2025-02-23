@@ -44,43 +44,43 @@ components:
       type: object
       properties:
         doc_type:
-          title: Doc Type (e.g., course, attribute, program)
+          title: Doc Type (one of "courses" - includes documents of "source":"courses_term" and "courses", "programs" - includes documents of "source":"programs", "attributes" - includes documents of "source":"attributes_flat" and "attributes_grouped")
           type: string
         course_code:
-          title: Course Code
+          title: Exclusive to "source":"attributes_flat", "courses_term", or "courses". Example format is DEPT (four digits) + SPACE + CODE (four digits) e.g., "CIS 1200"
           type: string
         course_title:
-          title: Course Title
+          title: Course Title. E.g., Programming Languages and Techniques I
           type: string
         course_unit:
-          title: Course Unit
+          title: Course Unit.
           type: string
         term:
-          title: Term (e.g., Fall 2023, Spring 2024)
+          title: Term (e.g., Fall 2023, Spring 2024). Format is "Term Year" e.g., "Fall 2023"
           type: string
         attribute:
-          title: Attribute
+          title: Refers to requirements that courses fulfill. Could be for a major (e.g., psychology major elective eligible - "PSYC Major Related Elective (APMR)") or a degree (e.g., sector requirement for the College - "COL Sector - Physical World (AUPW)"). Exclusive to "source":"attributes_flat" or "attributes_grouped". Attribute name e.g., "Writing Requirement"
           type: string
         program_url:
           title: Program URL
           type: string
         academic_level:
-          title: Academic Level
+          title: Academic Level - either "Undergraduate" or "Graduate"
           type: string
         school:
-          title: School
+          title: School - exclusive to "source":"programs" or "doc_type":"programs". One of 'The Wharton School', 'School of Nursing', 'School of Arts & Sciences', 'Stuart Weitzman School of Design', 'School of Engineering and Applied Science', 'Perelman School of Medicine', 'Graduate School of Education', 'School of Dental Medicine', 'School of Social Policy & Practice'
           type: string
         format:
-          title: Format (On-Campus, Online/Hybrid)
+          title: Format. "On-Campus" or "Online/Hybrid"
           type: string
         major_minor:
-          title: Major/Minor (Major, Minor)
+          title: Major/Minor. "Major" or "Minor"
           type: string
         degree:
-          title: Degree
+          title: Degree. Metadata in "source":"programs" or "doc_type":"programs". One of "Bachelor's" or "Master's".
           type: string
         requirements:
-          title: Requirements (e.g., courses needed)
+          title: Requirements for a program. Metadata in "source":"programs" or "doc_type":"programs" (e.g., courses needed)
           type: string
         subject_url:
           title: Subject URL
@@ -89,10 +89,10 @@ components:
           title: Course Code Number
           type: integer
         instructor:
-          title: Instructor (First name initial, period, space, then last name)
+          title: Instructor (First name initial, period, space, then last name). Only in "source":"courses_term".
           type: string
         source:
-          title: Source
+          title: Source of document. One of 'programs', 'courses', 'attributes_flat', 'attributes_grouped', 'courses_term'. Belongs to the following "doc_types" - 'courses' ("courses_term" and "courses"), 'programs' ("programs)"), 'attributes' ("attributes_flat" and "attributes_grouped")"
           type: string
     DocumentMetadataFilter:
       title: DocumentMetadataFilter
@@ -118,43 +118,43 @@ components:
           type: string
           format: date-time
         doc_type:
-          title: Doc Type (e.g., course, attribute, program)
+          title: Doc Type (one of "courses" - includes documents of "source":"courses_term" and "courses", "programs" - includes documents of "source":"programs", "attributes" - includes documents of "source":"attributes_flat" and "attributes_grouped")
           type: string
         course_code:
-          title: Course Code
+          title: Exclusive to "source":"attributes_flat", "courses_term", or "courses". Example format is DEPT (four digits) + SPACE + CODE (four digits) e.g., "CIS 1200"
           type: string
         course_title:
-          title: Course Title
+          title: Course Title. E.g., Programming Languages and Techniques I
           type: string
         course_unit:
-          title: Course Unit
+          title: Course Unit.
           type: string
         term:
-          title: Term (e.g., Fall 2023, Spring 2024)
+          title: Term (e.g., Fall 2023, Spring 2024). Format is "Term Year" e.g., "Fall 2023"
           type: string
         attribute:
-          title: Attribute
+          title: Refers to requirements that courses fulfill. Could be for a major (e.g., psychology major elective eligible - "PSYC Major Related Elective (APMR)") or a degree (e.g., sector requirement for the College - "COL Sector - Physical World (AUPW)"). Exclusive to "source":"attributes_flat" or "attributes_grouped". Attribute name e.g., "Writing Requirement"
           type: string
         program_url:
           title: Program URL
           type: string
         academic_level:
-          title: Academic Level
+          title: Academic Level - either "Undergraduate" or "Graduate"
           type: string
         school:
-          title: School
+          title: School - exclusive to "source":"programs" or "doc_type":"programs". One of 'The Wharton School', 'School of Nursing', 'School of Arts & Sciences', 'Stuart Weitzman School of Design', 'School of Engineering and Applied Science', 'Perelman School of Medicine', 'Graduate School of Education', 'School of Dental Medicine', 'School of Social Policy & Practice'
           type: string
         format:
-          title: Format
+          title: Format. "On-Campus" or "Online/Hybrid"
           type: string
         major_minor:
-          title: Major/Minor
+          title: Major/Minor. "Major" or "Minor"
           type: string
         degree:
-          title: Degree
+          title: Degree. Metadata in "source":"programs" or "doc_type":"programs". One of "Bachelor's" or "Master's".
           type: string
         requirements:
-          title: Requirements
+          title: Requirements for a program. Metadata in "source":"programs" or "doc_type":"programs" (e.g., courses needed)
           type: string
         subject_url:
           title: Subject URL
@@ -163,10 +163,13 @@ components:
           title: Course Code Number
           type: integer
         instructor:
-          title: Instructor (First name initial, period, space, then last name)
+          title: Instructor (First name initial, period, space, then last name). Only in "source":"courses_term".
+          type: string
+        source:
+          title: Source
           type: string
     Source:
-      title: Source
+      title: Source of document. One of 'programs', 'courses', 'attributes_flat', 'attributes_grouped', 'courses_term'. Belongs to the following "doc_types" - 'courses' ("courses_term" and "courses"), 'programs' ("programs)"), 'attributes' ("attributes_flat" and "attributes_grouped")"
       type: string
       enum:
         - email
